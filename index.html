@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bridge Scores Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1724;
+    --panel: #18223a;
+    --panel-2: #1f2d4d;
+    --text: #e6edf7;
+    --muted: #9aa6c0;
+    --accent: #6ea8fe;
+    --border: #2a3a5e;
+    --caroline: #f59e0b;
+    --david: #3b82f6;
+    --hamish: #ef4444;
+    --vivienne: #10b981;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    padding: 24px;
+  }
+  h1 { margin: 0 0 4px 0; font-size: 28px; }
+  .subtitle { color: var(--muted); margin-bottom: 24px; }
+  .controls {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    align-items: center;
+    background: var(--panel);
+    padding: 16px;
+    border-radius: 12px;
+    margin-bottom: 24px;
+    border: 1px solid var(--border);
+  }
+  .control-group { display: flex; flex-direction: column; gap: 6px; }
+  .control-group label { font-size: 12px; color: var(--muted); }
+  .player-toggles { display: flex; gap: 8px; flex-wrap: wrap; }
+  .player-chip {
+    padding: 6px 12px;
+    border-radius: 20px;
+    cursor: pointer;
+    user-select: none;
+    border: 2px solid transparent;
+    font-size: 13px;
+    font-weight: 600;
+    opacity: 0.45;
+    transition: opacity 0.15s;
+  }
+  .player-chip.active { opacity: 1; }
+  .player-chip[data-player="Caroline"] { background: var(--caroline); color: #000; }
+  .player-chip[data-player="David"] { background: var(--david); color: #fff; }
+  .player-chip[data-player="Hamish"] { background: var(--hamish); color: #fff; }
+  .player-chip[data-player="Vivienne"] { background: var(--vivienne); color: #fff; }
+  select, input[type="date"] {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+  }
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .kpi {
+    background: var(--panel);
+    padding: 16px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--accent);
+  }
+  .kpi[data-player="Caroline"] { border-left-color: var(--caroline); }
+  .kpi[data-player="David"] { border-left-color: var(--david); }
+  .kpi[data-player="Hamish"] { border-left-color: var(--hamish); }
+  .kpi[data-player="Vivienne"] { border-left-color: var(--vivienne); }
+  .kpi h3 { margin: 0 0 12px 0; font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .kpi-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
+  .kpi-stat .label { font-size: 11px; color: var(--muted); }
+  .kpi-stat .value { font-size: 18px; font-weight: 700; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 20px;
+    margin-bottom: 24px;
+  }
+  .card {
+    background: var(--panel);
+    padding: 20px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+  }
+  .card h2 { margin: 0 0 4px 0; font-size: 16px; }
+  .card .desc { color: var(--muted); font-size: 12px; margin-bottom: 16px; }
+  .col-12 { grid-column: span 12; }
+  .col-8 { grid-column: span 8; }
+  .col-6 { grid-column: span 6; }
+  .col-4 { grid-column: span 4; }
+  @media (max-width: 900px) {
+    .col-8, .col-6, .col-4 { grid-column: span 12; }
+  }
+  canvas { max-width: 100%; }
+  .chart-wrap { position: relative; height: 320px; }
+  .chart-wrap.tall { height: 380px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; cursor: pointer; user-select: none; }
+  th:hover { color: var(--accent); }
+  tr:hover td { background: var(--panel-2); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .table-wrap { max-height: 420px; overflow: auto; }
+  .pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .pill.yes { background: rgba(16,185,129,0.2); color: #34d399; }
+  .pill.no { background: rgba(239,68,68,0.2); color: #f87171; }
+  .footer { color: var(--muted); font-size: 12px; text-align: center; margin-top: 32px; }
+</style>
+</head>
+<body>
+
+<h1>Bridge Scores Dashboard</h1>
+<p class="subtitle">Analysis of form responses by player, date, score, and high card points.</p>
+
+<div class="controls">
+  <div class="control-group">
+    <label>Players</label>
+    <div class="player-toggles" id="player-toggles">
+      <span class="player-chip active" data-player="Caroline">Caroline</span>
+      <span class="player-chip active" data-player="David">David</span>
+      <span class="player-chip active" data-player="Hamish">Hamish</span>
+      <span class="player-chip active" data-player="Vivienne">Vivienne</span>
+    </div>
+  </div>
+  <div class="control-group">
+    <label>Session (date)</label>
+    <select id="date-filter">
+      <option value="">All sessions</option>
+    </select>
+  </div>
+  <div class="control-group">
+    <label>Won auction?</label>
+    <select id="auction-filter">
+      <option value="">Any</option>
+      <option value="yes">Yes (declared)</option>
+      <option value="no">No (defended)</option>
+    </select>
+  </div>
+</div>
+
+<div class="kpi-grid" id="kpi-grid"></div>
+
+<div class="grid">
+  <div class="card col-8">
+    <h2>Cumulative Score by Session</h2>
+    <p class="desc">Running total of points earned across sessions for each player.</p>
+    <div class="chart-wrap tall"><canvas id="cumulativeChart"></canvas></div>
+  </div>
+  <div class="card col-4">
+    <h2>Total Points</h2>
+    <p class="desc">Overall points scored.</p>
+    <div class="chart-wrap tall"><canvas id="totalChart"></canvas></div>
+  </div>
+
+  <div class="card col-12">
+    <h2>Points per Session</h2>
+    <p class="desc">Score each player earned in every session played.</p>
+    <div class="chart-wrap tall"><canvas id="perSessionChart"></canvas></div>
+  </div>
+
+  <div class="card col-6">
+    <h2>Average HCP Dealt</h2>
+    <p class="desc">Mean high card points held per hand. ~10 is the long-run expected value.</p>
+    <div class="chart-wrap"><canvas id="hcpAvgChart"></canvas></div>
+  </div>
+  <div class="card col-6">
+    <h2>HCP Distribution</h2>
+    <p class="desc">How frequently each player was dealt hands in each HCP bucket.</p>
+    <div class="chart-wrap"><canvas id="hcpDistChart"></canvas></div>
+  </div>
+
+  <div class="card col-12">
+    <h2>HCP vs Points Scored (per hand)</h2>
+    <p class="desc">Each dot is a single hand. Hover for details. Look for clusters of high-HCP/low-score (missed opportunities) or low-HCP/high-score (sacrifices &amp; defensive wins).</p>
+    <div class="chart-wrap tall"><canvas id="scatterChart"></canvas></div>
+  </div>
+
+  <div class="card col-6">
+    <h2>Declarer Performance</h2>
+    <p class="desc">Hands where this player was declarer: how many contracts they made vs. went down.</p>
+    <div class="chart-wrap"><canvas id="declarerChart"></canvas></div>
+  </div>
+  <div class="card col-6">
+    <h2>Contract Suit Breakdown</h2>
+    <p class="desc">Distribution of suits across all contracts in the filtered data.</p>
+    <div class="chart-wrap"><canvas id="suitChart"></canvas></div>
+  </div>
+
+  <div class="card col-12">
+    <h2>Hand-by-Hand Detail</h2>
+    <p class="desc">Filtered rows from the form responses. Click any column header to sort.</p>
+    <div class="table-wrap">
+      <table id="data-table">
+        <thead>
+          <tr>
+            <th data-sort="date">Date</th>
+            <th data-sort="hand" class="num">Hand</th>
+            <th data-sort="player">Player</th>
+            <th data-sort="hcp" class="num">HCP</th>
+            <th data-sort="wonAuction">Won Auction</th>
+            <th data-sort="declarer">Declarer</th>
+            <th data-sort="contract">Contract</th>
+            <th data-sort="made" class="num">Made</th>
+            <th data-sort="points" class="num">Points</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<p class="footer">Generated from Google Form responses · <span id="row-count"></span> rows total</p>
+
+<script src="data.js"></script>
+<script>
+const PLAYER_COLORS = {
+  Caroline: "#f59e0b",
+  David: "#3b82f6",
+  Hamish: "#ef4444",
+  Vivienne: "#10b981",
+};
+const PLAYERS = ["Caroline", "David", "Hamish", "Vivienne"];
+const SUIT_COLORS = {
+  "Clubs": "#64748b",
+  "Diamonds": "#f97316",
+  "Hearts": "#ef4444",
+  "Spades": "#1e293b",
+  "No Trumps": "#a855f7",
+};
+
+Chart.defaults.color = "#9aa6c0";
+Chart.defaults.borderColor = "#2a3a5e";
+Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+
+// Parse "dd/mm/yyyy" to Date for sorting
+function parseDate(s) {
+  const [d, m, y] = s.split("/");
+  return new Date(`${y}-${m}-${d}`);
+}
+function fmtDate(s) { return s; }
+
+const ROWS = window.DATA;
+document.getElementById("row-count").textContent = ROWS.length;
+
+// Build unique sorted session list
+const ALL_DATES = [...new Set(ROWS.map(r => r.date))].sort((a, b) => parseDate(a) - parseDate(b));
+
+// Populate date filter
+const dateFilter = document.getElementById("date-filter");
+ALL_DATES.forEach(d => {
+  const opt = document.createElement("option");
+  opt.value = d;
+  opt.textContent = d;
+  dateFilter.appendChild(opt);
+});
+
+// State
+const state = {
+  players: new Set(PLAYERS),
+  date: "",
+  auction: "",
+  sortKey: "date",
+  sortDir: 1,
+};
+
+// Wire up controls
+document.querySelectorAll(".player-chip").forEach(chip => {
+  chip.addEventListener("click", () => {
+    const p = chip.dataset.player;
+    if (state.players.has(p)) state.players.delete(p);
+    else state.players.add(p);
+    chip.classList.toggle("active");
+    if (state.players.size === 0) {
+      // re-enable to avoid empty state
+      state.players.add(p);
+      chip.classList.add("active");
+    }
+    render();
+  });
+});
+dateFilter.addEventListener("change", e => { state.date = e.target.value; render(); });
+document.getElementById("auction-filter").addEventListener("change", e => { state.auction = e.target.value; render(); });
+
+document.querySelectorAll("#data-table th").forEach(th => {
+  th.addEventListener("click", () => {
+    const k = th.dataset.sort;
+    if (state.sortKey === k) state.sortDir *= -1;
+    else { state.sortKey = k; state.sortDir = 1; }
+    renderTable();
+  });
+});
+
+function filterRows() {
+  return ROWS.filter(r => {
+    if (!state.players.has(r.player)) return false;
+    if (state.date && r.date !== state.date) return false;
+    if (state.auction === "yes" && !r.wonAuction) return false;
+    if (state.auction === "no" && r.wonAuction) return false;
+    return true;
+  });
+}
+
+// ---- Charts ----
+const charts = {};
+
+function makeChart(id, config) {
+  if (charts[id]) charts[id].destroy();
+  const ctx = document.getElementById(id).getContext("2d");
+  charts[id] = new Chart(ctx, config);
+}
+
+function renderKPIs(rows) {
+  const grid = document.getElementById("kpi-grid");
+  grid.innerHTML = "";
+  const players = [...state.players].sort();
+  players.forEach(p => {
+    const pr = rows.filter(r => r.player === p);
+    const total = pr.reduce((s, r) => s + r.points, 0);
+    const hands = pr.length;
+    const avgHcp = hands ? (pr.reduce((s, r) => s + (r.hcp || 0), 0) / hands) : 0;
+    const avgPts = hands ? total / hands : 0;
+    const decl = pr.filter(r => r.declarer === p);
+    const declMade = decl.filter(r => r.tricksMade != null && r.contractTricks != null && r.tricksMade >= r.contractTricks + 6).length;
+    const declRate = decl.length ? (declMade / decl.length * 100).toFixed(0) + "%" : "—";
+    const card = document.createElement("div");
+    card.className = "kpi";
+    card.dataset.player = p;
+    card.innerHTML = `
+      <h3>${p}</h3>
+      <div class="kpi-stats">
+        <div class="kpi-stat"><div class="label">Total points</div><div class="value">${total.toLocaleString()}</div></div>
+        <div class="kpi-stat"><div class="label">Hands played</div><div class="value">${hands}</div></div>
+        <div class="kpi-stat"><div class="label">Avg HCP</div><div class="value">${avgHcp.toFixed(1)}</div></div>
+        <div class="kpi-stat"><div class="label">Avg pts / hand</div><div class="value">${avgPts.toFixed(0)}</div></div>
+        <div class="kpi-stat"><div class="label">Hands as declarer</div><div class="value">${decl.length}</div></div>
+        <div class="kpi-stat"><div class="label">Contracts made</div><div class="value">${declRate}</div></div>
+      </div>`;
+    grid.appendChild(card);
+  });
+}
+
+function renderCumulative(rows) {
+  const dates = state.date ? [state.date] : ALL_DATES;
+  const players = [...state.players].sort();
+  // Sum points per (player, date)
+  const totals = {};
+  players.forEach(p => totals[p] = {});
+  rows.forEach(r => {
+    if (!totals[r.player]) return;
+    totals[r.player][r.date] = (totals[r.player][r.date] || 0) + r.points;
+  });
+  const datasets = players.map(p => {
+    let running = 0;
+    const data = dates.map(d => {
+      running += (totals[p][d] || 0);
+      return running;
+    });
+    return {
+      label: p,
+      data,
+      borderColor: PLAYER_COLORS[p],
+      backgroundColor: PLAYER_COLORS[p] + "33",
+      tension: 0.25,
+      fill: false,
+      pointRadius: 3,
+    };
+  });
+  makeChart("cumulativeChart", {
+    type: "line",
+    data: { labels: dates, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: "bottom" } },
+      scales: { y: { beginAtZero: true, ticks: { callback: v => v.toLocaleString() } } },
+    },
+  });
+}
+
+function renderTotal(rows) {
+  const players = [...state.players].sort();
+  const totals = players.map(p => rows.filter(r => r.player === p).reduce((s, r) => s + r.points, 0));
+  makeChart("totalChart", {
+    type: "bar",
+    data: {
+      labels: players,
+      datasets: [{
+        data: totals,
+        backgroundColor: players.map(p => PLAYER_COLORS[p]),
+      }],
+    },
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { x: { beginAtZero: true, ticks: { callback: v => v.toLocaleString() } } },
+    },
+  });
+}
+
+function renderPerSession(rows) {
+  const dates = state.date ? [state.date] : ALL_DATES;
+  const players = [...state.players].sort();
+  const datasets = players.map(p => ({
+    label: p,
+    data: dates.map(d => rows.filter(r => r.player === p && r.date === d).reduce((s, r) => s + r.points, 0)),
+    backgroundColor: PLAYER_COLORS[p],
+  }));
+  makeChart("perSessionChart", {
+    type: "bar",
+    data: { labels: dates, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: "bottom" } },
+      scales: { y: { beginAtZero: true, ticks: { callback: v => v.toLocaleString() } } },
+    },
+  });
+}
+
+function renderHcpAvg(rows) {
+  const players = [...state.players].sort();
+  const data = players.map(p => {
+    const pr = rows.filter(r => r.player === p && r.hcp != null);
+    return pr.length ? pr.reduce((s, r) => s + r.hcp, 0) / pr.length : 0;
+  });
+  makeChart("hcpAvgChart", {
+    type: "bar",
+    data: {
+      labels: players,
+      datasets: [{
+        label: "Avg HCP",
+        data,
+        backgroundColor: players.map(p => PLAYER_COLORS[p]),
+      }, {
+        label: "Expected (10)",
+        data: players.map(() => 10),
+        type: "line",
+        borderColor: "#9aa6c0",
+        borderDash: [4, 4],
+        pointRadius: 0,
+        fill: false,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: "bottom" } },
+      scales: { y: { beginAtZero: true, max: 20 } },
+    },
+  });
+}
+
+function renderHcpDist(rows) {
+  // Buckets: 0-4, 5-9, 10-14, 15-19, 20+
+  const buckets = ["0–4", "5–9", "10–14", "15–19", "20+"];
+  function bucketOf(h) {
+    if (h < 5) return 0;
+    if (h < 10) return 1;
+    if (h < 15) return 2;
+    if (h < 20) return 3;
+    return 4;
+  }
+  const players = [...state.players].sort();
+  const datasets = players.map(p => {
+    const counts = [0, 0, 0, 0, 0];
+    rows.filter(r => r.player === p && r.hcp != null).forEach(r => counts[bucketOf(r.hcp)]++);
+    return {
+      label: p,
+      data: counts,
+      backgroundColor: PLAYER_COLORS[p],
+    };
+  });
+  makeChart("hcpDistChart", {
+    type: "bar",
+    data: { labels: buckets, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: "bottom" } },
+      scales: { x: { title: { display: true, text: "HCP range" } }, y: { beginAtZero: true, title: { display: true, text: "# hands" } } },
+    },
+  });
+}
+
+function renderScatter(rows) {
+  const players = [...state.players].sort();
+  const datasets = players.map(p => ({
+    label: p,
+    data: rows
+      .filter(r => r.player === p && r.hcp != null)
+      .map(r => ({ x: r.hcp, y: r.points, date: r.date, hand: r.hand })),
+    backgroundColor: PLAYER_COLORS[p] + "cc",
+    borderColor: PLAYER_COLORS[p],
+    pointRadius: 5,
+  }));
+  makeChart("scatterChart", {
+    type: "scatter",
+    data: { datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: "bottom" },
+        tooltip: {
+          callbacks: {
+            label: c => `${c.dataset.label}: HCP ${c.raw.x}, pts ${c.raw.y} (${c.raw.date} #${c.raw.hand})`,
+          },
+        },
+      },
+      scales: {
+        x: { title: { display: true, text: "HCP" }, beginAtZero: true },
+        y: { title: { display: true, text: "Points" } },
+      },
+    },
+  });
+}
+
+function renderDeclarer(rows) {
+  const players = [...state.players].sort();
+  const made = [], down = [];
+  players.forEach(p => {
+    const decl = rows.filter(r => r.declarer === p && r.contractTricks != null && r.tricksMade != null);
+    const m = decl.filter(r => r.tricksMade >= r.contractTricks + 6).length;
+    const d = decl.length - m;
+    made.push(m); down.push(d);
+  });
+  makeChart("declarerChart", {
+    type: "bar",
+    data: {
+      labels: players,
+      datasets: [
+        { label: "Contracts made", data: made, backgroundColor: "#10b981" },
+        { label: "Went down", data: down, backgroundColor: "#ef4444" },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: "bottom" } },
+      scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
+    },
+  });
+}
+
+function renderSuit(rows) {
+  // Use rows that have a suit (i.e. contracts). De-dupe per (date, hand) to avoid 4x counting.
+  const seen = new Set();
+  const counts = {};
+  rows.forEach(r => {
+    if (!r.suit) return;
+    const k = `${r.date}|${r.hand}`;
+    if (seen.has(k)) return;
+    seen.add(k);
+    counts[r.suit] = (counts[r.suit] || 0) + 1;
+  });
+  const labels = Object.keys(counts);
+  makeChart("suitChart", {
+    type: "doughnut",
+    data: {
+      labels,
+      datasets: [{
+        data: labels.map(s => counts[s]),
+        backgroundColor: labels.map(s => SUIT_COLORS[s] || "#6ea8fe"),
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: "right" } },
+    },
+  });
+}
+
+function renderTable() {
+  const rows = filterRows();
+  const sortKey = state.sortKey;
+  const dir = state.sortDir;
+  const sorted = [...rows].sort((a, b) => {
+    let av, bv;
+    if (sortKey === "date") { av = parseDate(a.date); bv = parseDate(b.date); }
+    else if (sortKey === "contract") {
+      av = `${a.contractTricks || ""} ${a.suit || ""}`;
+      bv = `${b.contractTricks || ""} ${b.suit || ""}`;
+    } else if (sortKey === "made") { av = a.tricksMade ?? -1; bv = b.tricksMade ?? -1; }
+    else { av = a[sortKey] ?? ""; bv = b[sortKey] ?? ""; }
+    if (av < bv) return -1 * dir;
+    if (av > bv) return 1 * dir;
+    return 0;
+  });
+  const tbody = document.querySelector("#data-table tbody");
+  tbody.innerHTML = sorted.map(r => {
+    const contract = r.contractTricks ? `${r.contractTricks} ${r.suit || ""}` : "—";
+    return `<tr>
+      <td>${r.date}</td>
+      <td class="num">${r.hand}</td>
+      <td style="color:${PLAYER_COLORS[r.player]};font-weight:600">${r.player}</td>
+      <td class="num">${r.hcp ?? ""}</td>
+      <td><span class="pill ${r.wonAuction ? "yes" : "no"}">${r.wonAuction ? "Yes" : "No"}</span></td>
+      <td>${r.declarer ?? "—"}</td>
+      <td>${contract}</td>
+      <td class="num">${r.tricksMade ?? "—"}</td>
+      <td class="num">${r.points.toLocaleString()}</td>
+    </tr>`;
+  }).join("");
+}
+
+function render() {
+  const rows = filterRows();
+  renderKPIs(rows);
+  renderCumulative(rows);
+  renderTotal(rows);
+  renderPerSession(rows);
+  renderHcpAvg(rows);
+  renderHcpDist(rows);
+  renderScatter(rows);
+  renderDeclarer(rows);
+  renderSuit(rows);
+  renderTable();
+}
+
+render();
+</script>
+</body>
+</html>
