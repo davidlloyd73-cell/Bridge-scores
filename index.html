@@ -1,231 +1,472 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Bridge Scores Dashboard</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Bridge Scores · Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
   :root {
-    --bg: #0f1724;
-    --panel: #18223a;
-    --panel-2: #1f2d4d;
-    --text: #e6edf7;
-    --muted: #9aa6c0;
-    --accent: #6ea8fe;
-    --border: #2a3a5e;
-    --caroline: #f59e0b;
-    --david: #3b82f6;
-    --hamish: #ef4444;
-    --vivienne: #10b981;
+    --bg: #0b0f1c;
+    --bg-2: #0f1426;
+    --panel: #141a30;
+    --panel-2: #1a2240;
+    --line: #232c4d;
+    --text: #eef2ff;
+    --muted: #8b94b8;
+    --muted-2: #5b6588;
+    --accent: #7c9cff;
+    --accent-2: #b794ff;
+
+    /* Player palette — distinct, warm/cool spread */
+    --caroline: #ffb454;
+    --david:    #5b8def;
+    --hamish:   #ef5675;
+    --vivienne: #2ec4b6;
+
+    /* Suit colors */
+    --clubs: #94a3b8;
+    --diamonds: #f97316;
+    --hearts: #ef4444;
+    --spades: #e2e8f0;
+    --notrumps: #a855f7;
   }
   * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); }
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    margin: 0;
-    background: var(--bg);
-    color: var(--text);
-    padding: 24px;
+    font-family: 'Inter', -apple-system, sans-serif;
+    background:
+      radial-gradient(1200px 600px at -10% -20%, rgba(124,156,255,0.12), transparent 60%),
+      radial-gradient(1000px 500px at 110% 0%, rgba(183,148,255,0.10), transparent 60%),
+      var(--bg);
+    min-height: 100vh;
+    padding: 28px 32px 64px;
   }
-  h1 { margin: 0 0 4px 0; font-size: 28px; }
-  .subtitle { color: var(--muted); margin-bottom: 24px; }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+
+  /* ------- HEADER ------- */
+  header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 28px; gap: 20px; flex-wrap: wrap; }
+  h1 { font-size: 28px; font-weight: 800; margin: 0; letter-spacing: -0.02em; }
+  h1 .accent { background: linear-gradient(135deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .subtitle { color: var(--muted); margin: 4px 0 0; font-size: 14px; }
+  .meta { color: var(--muted); font-size: 12px; text-align: right; }
+
+  /* ------- CONTROLS ------- */
   .controls {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 14px 18px;
     display: flex;
-    gap: 16px;
+    gap: 24px;
     flex-wrap: wrap;
     align-items: center;
-    background: var(--panel);
-    padding: 16px;
-    border-radius: 12px;
     margin-bottom: 24px;
-    border: 1px solid var(--border);
   }
-  .control-group { display: flex; flex-direction: column; gap: 6px; }
-  .control-group label { font-size: 12px; color: var(--muted); }
-  .player-toggles { display: flex; gap: 8px; flex-wrap: wrap; }
-  .player-chip {
+  .control { display: flex; flex-direction: column; gap: 6px; }
+  .control > label { font-size: 11px; color: var(--muted-2); text-transform: uppercase; letter-spacing: 0.08em; }
+  .chip-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip {
     padding: 6px 12px;
-    border-radius: 20px;
+    border-radius: 999px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
     cursor: pointer;
     user-select: none;
-    border: 2px solid transparent;
-    font-size: 13px;
-    font-weight: 600;
-    opacity: 0.45;
-    transition: opacity 0.15s;
+    transition: all 0.15s;
   }
-  .player-chip.active { opacity: 1; }
-  .player-chip[data-player="Caroline"] { background: var(--caroline); color: #000; }
-  .player-chip[data-player="David"] { background: var(--david); color: #fff; }
-  .player-chip[data-player="Hamish"] { background: var(--hamish); color: #fff; }
-  .player-chip[data-player="Vivienne"] { background: var(--vivienne); color: #fff; }
-  select, input[type="date"] {
+  .chip.active { color: #0b0f1c; border-color: transparent; }
+  .chip.active[data-player="Caroline"] { background: var(--caroline); }
+  .chip.active[data-player="David"]    { background: var(--david); color: #fff; }
+  .chip.active[data-player="Hamish"]   { background: var(--hamish); color: #fff; }
+  .chip.active[data-player="Vivienne"] { background: var(--vivienne); color: #fff; }
+  select, input[type="text"] {
     background: var(--panel-2);
     color: var(--text);
-    border: 1px solid var(--border);
-    padding: 6px 10px;
-    border-radius: 6px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 7px 10px;
     font-size: 13px;
+    font-family: inherit;
+    min-width: 160px;
   }
-  .kpi-grid {
+  select:focus, input:focus { outline: 2px solid var(--accent); }
+
+  /* ------- LAYOUT ------- */
+  .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 20px; }
+  .panel {
+    background: linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 22px;
+    overflow: hidden;
+  }
+  .panel-title { font-size: 13px; color: var(--muted); margin: 0 0 4px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
+  .panel h2 { font-size: 18px; font-weight: 700; margin: 0 0 4px; }
+  .panel .help { color: var(--muted); font-size: 12px; margin-bottom: 14px; }
+  .span-12 { grid-column: span 12; }
+  .span-8 { grid-column: span 8; }
+  .span-7 { grid-column: span 7; }
+  .span-6 { grid-column: span 6; }
+  .span-5 { grid-column: span 5; }
+  .span-4 { grid-column: span 4; }
+  @media (max-width: 1100px) {
+    .span-7, .span-8, .span-5, .span-4 { grid-column: span 12; }
+    .span-6 { grid-column: span 12; }
+  }
+  .chart-box { position: relative; height: 320px; }
+  .chart-box.tall { height: 420px; }
+  .chart-box.short { height: 240px; }
+
+  /* ------- HERO ------- */
+  .hero {
+    grid-column: span 12;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 16px;
-    margin-bottom: 24px;
+    grid-template-columns: 1.2fr 2fr;
+    gap: 0;
+    padding: 0;
+    overflow: hidden;
+    background:
+      radial-gradient(600px 300px at 100% 0%, rgba(46,196,182,0.15), transparent),
+      linear-gradient(135deg, #1a2240, #0f1426);
+    border: 1px solid var(--line);
+    border-radius: 16px;
   }
-  .kpi {
-    background: var(--panel);
-    padding: 16px;
-    border-radius: 12px;
-    border: 1px solid var(--border);
-    border-left: 4px solid var(--accent);
-  }
-  .kpi[data-player="Caroline"] { border-left-color: var(--caroline); }
-  .kpi[data-player="David"] { border-left-color: var(--david); }
-  .kpi[data-player="Hamish"] { border-left-color: var(--hamish); }
-  .kpi[data-player="Vivienne"] { border-left-color: var(--vivienne); }
-  .kpi h3 { margin: 0 0 12px 0; font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
-  .kpi-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
-  .kpi-stat .label { font-size: 11px; color: var(--muted); }
-  .kpi-stat .value { font-size: 18px; font-weight: 700; }
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(12, 1fr);
-    gap: 20px;
-    margin-bottom: 24px;
-  }
-  .card {
-    background: var(--panel);
-    padding: 20px;
-    border-radius: 12px;
-    border: 1px solid var(--border);
-  }
-  .card h2 { margin: 0 0 4px 0; font-size: 16px; }
-  .card .desc { color: var(--muted); font-size: 12px; margin-bottom: 16px; }
-  .col-12 { grid-column: span 12; }
-  .col-8 { grid-column: span 8; }
-  .col-6 { grid-column: span 6; }
-  .col-4 { grid-column: span 4; }
-  @media (max-width: 900px) {
-    .col-8, .col-6, .col-4 { grid-column: span 12; }
-  }
-  canvas { max-width: 100%; }
-  .chart-wrap { position: relative; height: 320px; }
-  .chart-wrap.tall { height: 380px; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); }
-  th { color: var(--muted); font-weight: 600; cursor: pointer; user-select: none; }
-  th:hover { color: var(--accent); }
-  tr:hover td { background: var(--panel-2); }
-  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
-  .table-wrap { max-height: 420px; overflow: auto; }
-  .pill {
+  .hero-left { padding: 24px; border-right: 1px solid var(--line); }
+  .hero-right { padding: 24px; }
+  .latest-eyebrow { font-size: 11px; letter-spacing: 0.12em; color: var(--accent); text-transform: uppercase; font-weight: 700; margin-bottom: 8px; }
+  .latest-date { font-size: 22px; font-weight: 700; margin: 0 0 16px; }
+  .latest-grid { display: grid; grid-template-columns: max-content 1fr; gap: 8px 16px; font-size: 13px; }
+  .latest-grid .k { color: var(--muted); }
+  .latest-grid .v { font-weight: 600; }
+  .pair-badge {
     display: inline-block;
     padding: 2px 8px;
-    border-radius: 10px;
-    font-size: 11px;
+    border-radius: 6px;
+    background: rgba(124,156,255,0.15);
+    color: var(--accent);
     font-weight: 600;
+    font-size: 12px;
   }
-  .pill.yes { background: rgba(16,185,129,0.2); color: #34d399; }
-  .pill.no { background: rgba(239,68,68,0.2); color: #f87171; }
-  .footer { color: var(--muted); font-size: 12px; text-align: center; margin-top: 32px; }
+  .standings { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; height: 100%; }
+  .standing {
+    background: rgba(0,0,0,0.25);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+    overflow: hidden;
+  }
+  .standing::before {
+    content: '';
+    position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+    background: var(--accent);
+  }
+  .standing[data-p="Caroline"]::before { background: var(--caroline); }
+  .standing[data-p="David"]::before    { background: var(--david); }
+  .standing[data-p="Hamish"]::before   { background: var(--hamish); }
+  .standing[data-p="Vivienne"]::before { background: var(--vivienne); }
+  .standing .name { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; }
+  .standing .total { font-size: 28px; font-weight: 800; margin-top: 4px; }
+  .standing .delta { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .standing .delta.up { color: var(--vivienne); }
+  .standing .delta.down { color: var(--hamish); }
+
+  /* ------- LEAGUE TABLE ------- */
+  table.league { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.league th, table.league td { padding: 10px 12px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  table.league th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; cursor: pointer; user-select: none; }
+  table.league th:hover { color: var(--accent); }
+  table.league th:first-child, table.league td:first-child { text-align: left; }
+  table.league td.player {
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  table.league td.player .swatch {
+    width: 10px; height: 10px; border-radius: 50%; display: inline-block;
+  }
+  table.league tr:hover td { background: rgba(124,156,255,0.05); }
+  .bar-cell {
+    position: relative;
+    width: 100px;
+    background: var(--panel-2);
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+    display: inline-block;
+    vertical-align: middle;
+  }
+  .bar-cell .fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); border-radius: 4px; }
+
+  /* ------- KPI CARDS ------- */
+  .records-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  @media (max-width: 900px) { .records-grid { grid-template-columns: 1fr 1fr; } }
+  .record-card {
+    background: rgba(0,0,0,0.2);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px;
+  }
+  .record-card .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .record-card .value { font-size: 22px; font-weight: 800; margin: 4px 0; }
+  .record-card .meta-line { font-size: 11px; color: var(--muted); }
+
+  /* ------- PARTNERSHIP MATRIX ------- */
+  .matrix { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  @media (max-width: 900px) { .matrix { grid-template-columns: 1fr; } }
+  .pair-card {
+    background: rgba(0,0,0,0.2);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px;
+  }
+  .pair-card .pair-name { font-weight: 700; font-size: 14px; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+  .swatch-sm { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .pair-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 12px; }
+  .pair-stat .v { font-weight: 700; font-size: 16px; }
+  .pair-stat .k { color: var(--muted); }
+
+  /* ------- HAND LOG ------- */
+  .log-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .log-table th, .log-table td { padding: 6px 10px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .log-table th { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; cursor: pointer; user-select: none; position: sticky; top: 0; background: var(--panel-2); z-index: 1; }
+  .log-table th.num, .log-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .log-wrap { max-height: 460px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
+  .pill {
+    display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+  }
+  .pill.made { background: rgba(46,196,182,0.18); color: var(--vivienne); }
+  .pill.down { background: rgba(239,86,117,0.18); color: var(--hamish); }
+  .pill.over { background: rgba(124,156,255,0.18); color: var(--accent); }
+  .pname { font-weight: 600; }
+  .pname[data-p="Caroline"] { color: var(--caroline); }
+  .pname[data-p="David"]    { color: var(--david); }
+  .pname[data-p="Hamish"]   { color: var(--hamish); }
+  .pname[data-p="Vivienne"] { color: var(--vivienne); }
+
+  .suit-c { color: var(--clubs); }
+  .suit-d { color: var(--diamonds); }
+  .suit-h { color: var(--hearts); }
+  .suit-s { color: var(--spades); }
+  .suit-n { color: var(--notrumps); }
+
+  footer { text-align: center; color: var(--muted-2); font-size: 12px; margin-top: 36px; }
 </style>
 </head>
 <body>
 
-<h1>Bridge Scores Dashboard</h1>
-<p class="subtitle">Analysis of form responses by player, date, score, and high card points.</p>
+<header>
+  <div>
+    <h1>Bridge Scores · <span class="accent">Live Dashboard</span></h1>
+    <p class="subtitle">Every hand from the Sunday-night four-handed game, sliced by player, session, HCP and partnership.</p>
+  </div>
+  <div class="meta" id="meta"></div>
+</header>
 
 <div class="controls">
-  <div class="control-group">
+  <div class="control">
     <label>Players</label>
-    <div class="player-toggles" id="player-toggles">
-      <span class="player-chip active" data-player="Caroline">Caroline</span>
-      <span class="player-chip active" data-player="David">David</span>
-      <span class="player-chip active" data-player="Hamish">Hamish</span>
-      <span class="player-chip active" data-player="Vivienne">Vivienne</span>
+    <div class="chip-row" id="player-chips">
+      <span class="chip active" data-player="Caroline">Caroline</span>
+      <span class="chip active" data-player="David">David</span>
+      <span class="chip active" data-player="Hamish">Hamish</span>
+      <span class="chip active" data-player="Vivienne">Vivienne</span>
     </div>
   </div>
-  <div class="control-group">
-    <label>Session (date)</label>
-    <select id="date-filter">
-      <option value="">All sessions</option>
+  <div class="control">
+    <label>Session</label>
+    <select id="date-filter"><option value="">All sessions</option></select>
+  </div>
+  <div class="control">
+    <label>Auction</label>
+    <select id="auction-filter">
+      <option value="">All hands</option>
+      <option value="declared">As declarer team</option>
+      <option value="defended">As defender team</option>
     </select>
   </div>
-  <div class="control-group">
-    <label>Won auction?</label>
-    <select id="auction-filter">
-      <option value="">Any</option>
-      <option value="yes">Yes (declared)</option>
-      <option value="no">No (defended)</option>
+  <div class="control">
+    <label>Contract suit</label>
+    <select id="suit-filter">
+      <option value="">All suits</option>
+      <option>Clubs</option>
+      <option>Diamonds</option>
+      <option>Hearts</option>
+      <option>Spades</option>
+      <option>No Trumps</option>
     </select>
   </div>
 </div>
 
-<div class="kpi-grid" id="kpi-grid"></div>
-
 <div class="grid">
-  <div class="card col-8">
-    <h2>Cumulative Score by Session</h2>
-    <p class="desc">Running total of points earned across sessions for each player.</p>
-    <div class="chart-wrap tall"><canvas id="cumulativeChart"></canvas></div>
-  </div>
-  <div class="card col-4">
-    <h2>Total Points</h2>
-    <p class="desc">Overall points scored.</p>
-    <div class="chart-wrap tall"><canvas id="totalChart"></canvas></div>
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-left">
+      <div class="latest-eyebrow">Latest hand</div>
+      <h2 class="latest-date" id="latest-date">—</h2>
+      <div class="latest-grid">
+        <div class="k">Hand #</div><div class="v" id="latest-hand">—</div>
+        <div class="k">Declarer</div><div class="v" id="latest-declarer">—</div>
+        <div class="k">Contract</div><div class="v" id="latest-contract">—</div>
+        <div class="k">Tricks made</div><div class="v" id="latest-made">—</div>
+        <div class="k">Result</div><div class="v" id="latest-result">—</div>
+        <div class="k">Score</div><div class="v" id="latest-score">—</div>
+      </div>
+    </div>
+    <div class="hero-right">
+      <div class="latest-eyebrow">Current standings · Grand total</div>
+      <div class="standings" id="standings"></div>
+    </div>
   </div>
 
-  <div class="card col-12">
-    <h2>Points per Session</h2>
-    <p class="desc">Score each player earned in every session played.</p>
-    <div class="chart-wrap tall"><canvas id="perSessionChart"></canvas></div>
+  <!-- LEAGUE TABLE -->
+  <div class="panel span-12">
+    <p class="panel-title">League table</p>
+    <h2>All-time stats per player <span style="color:var(--muted);font-weight:400;font-size:13px;">· click a header to sort</span></h2>
+    <p class="help">Efficiency = points scored per HCP dealt. Decl % = contracts made when declarer. Best/worst sessions are the player's individual session totals.</p>
+    <table class="league" id="league-table">
+      <thead>
+        <tr>
+          <th data-k="player">Player</th>
+          <th data-k="total">Total</th>
+          <th data-k="perHand">Pts / hand</th>
+          <th data-k="perSession">Pts / session</th>
+          <th data-k="hands">Hands</th>
+          <th data-k="avgHcp">Avg HCP</th>
+          <th data-k="efficiency">Efficiency</th>
+          <th data-k="declCount">As decl.</th>
+          <th data-k="declRate">Decl %</th>
+          <th data-k="best">Best session</th>
+          <th data-k="worst">Worst session</th>
+          <th data-k="trend">Trend</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
   </div>
 
-  <div class="card col-6">
-    <h2>Average HCP Dealt</h2>
-    <p class="desc">Mean high card points held per hand. ~10 is the long-run expected value.</p>
-    <div class="chart-wrap"><canvas id="hcpAvgChart"></canvas></div>
-  </div>
-  <div class="card col-6">
-    <h2>HCP Distribution</h2>
-    <p class="desc">How frequently each player was dealt hands in each HCP bucket.</p>
-    <div class="chart-wrap"><canvas id="hcpDistChart"></canvas></div>
+  <!-- CUMULATIVE -->
+  <div class="panel span-8">
+    <p class="panel-title">Score progression</p>
+    <h2>Cumulative score across sessions</h2>
+    <p class="help">The running total after every session played.</p>
+    <div class="chart-box tall"><canvas id="cumChart"></canvas></div>
   </div>
 
-  <div class="card col-12">
-    <h2>HCP vs Points Scored (per hand)</h2>
-    <p class="desc">Each dot is a single hand. Hover for details. Look for clusters of high-HCP/low-score (missed opportunities) or low-HCP/high-score (sacrifices &amp; defensive wins).</p>
-    <div class="chart-wrap tall"><canvas id="scatterChart"></canvas></div>
+  <!-- SESSION WINNERS -->
+  <div class="panel span-4">
+    <p class="panel-title">Session wins</p>
+    <h2>Who topped each session?</h2>
+    <p class="help">Number of sessions where this player had the highest total.</p>
+    <div class="chart-box tall"><canvas id="sessionWinsChart"></canvas></div>
   </div>
 
-  <div class="card col-6">
-    <h2>Declarer Performance</h2>
-    <p class="desc">Hands where this player was declarer: how many contracts they made vs. went down.</p>
-    <div class="chart-wrap"><canvas id="declarerChart"></canvas></div>
-  </div>
-  <div class="card col-6">
-    <h2>Contract Suit Breakdown</h2>
-    <p class="desc">Distribution of suits across all contracts in the filtered data.</p>
-    <div class="chart-wrap"><canvas id="suitChart"></canvas></div>
+  <!-- PER SESSION BARS -->
+  <div class="panel span-12">
+    <p class="panel-title">Per-session breakdown</p>
+    <h2>Points scored each session</h2>
+    <p class="help">Grouped bars: each player&apos;s total for every session in the filter.</p>
+    <div class="chart-box tall"><canvas id="perSessionChart"></canvas></div>
   </div>
 
-  <div class="card col-12">
-    <h2>Hand-by-Hand Detail</h2>
-    <p class="desc">Filtered rows from the form responses. Click any column header to sort.</p>
-    <div class="table-wrap">
-      <table id="data-table">
+  <!-- HCP FAIRNESS -->
+  <div class="panel span-7">
+    <p class="panel-title">Card luck</p>
+    <h2>Average HCP dealt per session</h2>
+    <p class="help">The cards should average 10 HCP per player. Consistent over- or under-shooting is luck (or shuffle bias). Dashed line shows the expected value.</p>
+    <div class="chart-box"><canvas id="hcpSessionChart"></canvas></div>
+  </div>
+
+  <!-- HCP DIST -->
+  <div class="panel span-5">
+    <p class="panel-title">Hand quality distribution</p>
+    <h2>HCP buckets per player</h2>
+    <p class="help">Frequency of each hand-strength bucket. Look for shapes that drift away from the average curve.</p>
+    <div class="chart-box"><canvas id="hcpDistChart"></canvas></div>
+  </div>
+
+  <!-- EFFICIENCY -->
+  <div class="panel span-6">
+    <p class="panel-title">Conversion</p>
+    <h2>Points per HCP dealt</h2>
+    <p class="help">How efficiently each player turns their cards into points. A higher value beats their card luck; a lower value wastes it.</p>
+    <div class="chart-box"><canvas id="efficiencyChart"></canvas></div>
+  </div>
+
+  <!-- HCP vs POINTS -->
+  <div class="panel span-6">
+    <p class="panel-title">Hand outcomes</p>
+    <h2>HCP vs points per hand</h2>
+    <p class="help">Each point is one hand. Hover to inspect. Look for outliers: low-HCP big wins (penalties &amp; sacrifices) and high-HCP zeros (missed opportunities).</p>
+    <div class="chart-box"><canvas id="scatterChart"></canvas></div>
+  </div>
+
+  <!-- DECLARER -->
+  <div class="panel span-7">
+    <p class="panel-title">As declarer</p>
+    <h2>Contract success by player</h2>
+    <p class="help">When this player was the declarer, did they make the contract? Bar = total contracts; segments = made / went down.</p>
+    <div class="chart-box"><canvas id="declarerChart"></canvas></div>
+  </div>
+
+  <!-- SUITS -->
+  <div class="panel span-5">
+    <p class="panel-title">Contract suit mix</p>
+    <h2>What did we play in?</h2>
+    <p class="help">Distribution of the contract suits across all hands in the filter.</p>
+    <div class="chart-box"><canvas id="suitChart"></canvas></div>
+  </div>
+
+  <!-- PARTNERSHIP -->
+  <div class="panel span-12">
+    <p class="panel-title">Partnerships</p>
+    <h2>How the three possible pairings perform</h2>
+    <p class="help">Bridge rotates partners. For each of the three possible pairings, how many hands they declared together, how many they made, and the net points won across all those hands.</p>
+    <div class="matrix" id="pair-matrix"></div>
+  </div>
+
+  <!-- RECORDS -->
+  <div class="panel span-12">
+    <p class="panel-title">Records &amp; superlatives</p>
+    <h2>The hall of fame (and shame)</h2>
+    <p class="help">Computed from the currently filtered hands.</p>
+    <div class="records-grid" id="records"></div>
+  </div>
+
+  <!-- HAND LOG -->
+  <div class="panel span-12">
+    <p class="panel-title">Hand-by-hand</p>
+    <h2>Detailed log <span style="color:var(--muted);font-weight:400;font-size:13px;">· showing <span id="log-count">0</span> rows</span></h2>
+    <p class="help">Click any column to sort. Search filters across player, declarer and suit.</p>
+    <div style="display:flex;gap:12px;margin-bottom:10px;">
+      <input type="text" id="log-search" placeholder="Search player / declarer / suit…" style="flex:1;" />
+    </div>
+    <div class="log-wrap">
+      <table class="log-table" id="log-table">
         <thead>
           <tr>
-            <th data-sort="date">Date</th>
-            <th data-sort="hand" class="num">Hand</th>
-            <th data-sort="player">Player</th>
-            <th data-sort="hcp" class="num">HCP</th>
-            <th data-sort="wonAuction">Won Auction</th>
-            <th data-sort="declarer">Declarer</th>
-            <th data-sort="contract">Contract</th>
-            <th data-sort="made" class="num">Made</th>
-            <th data-sort="points" class="num">Points</th>
+            <th data-k="date">Date</th>
+            <th data-k="hand" class="num">Hand</th>
+            <th data-k="player">Player</th>
+            <th data-k="hcp" class="num">HCP</th>
+            <th data-k="role">Role</th>
+            <th data-k="declarer">Declarer</th>
+            <th data-k="contract">Contract</th>
+            <th data-k="made" class="num">Made</th>
+            <th data-k="result">Result</th>
+            <th data-k="pts" class="num">Points</th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -234,415 +475,810 @@
   </div>
 </div>
 
-<p class="footer">Generated from Google Form responses · <span id="row-count"></span> rows total</p>
+<footer>Generated from the Google Form responses · <span id="row-count"></span> hand-entries · refresh after adding new sessions.</footer>
 
 <script src="data.js"></script>
 <script>
-const PLAYER_COLORS = {
-  Caroline: "#f59e0b",
-  David: "#3b82f6",
-  Hamish: "#ef4444",
-  Vivienne: "#10b981",
-};
+/* ============================================================
+   Bridge Scores · interactive dashboard
+   ============================================================ */
 const PLAYERS = ["Caroline", "David", "Hamish", "Vivienne"];
-const SUIT_COLORS = {
-  "Clubs": "#64748b",
-  "Diamonds": "#f97316",
-  "Hearts": "#ef4444",
-  "Spades": "#1e293b",
-  "No Trumps": "#a855f7",
+const PCOL = {
+  Caroline: "#ffb454",
+  David:    "#5b8def",
+  Hamish:   "#ef5675",
+  Vivienne: "#2ec4b6",
+};
+const SCOL = {
+  Clubs: "#94a3b8", Diamonds: "#f97316", Hearts: "#ef4444",
+  Spades: "#cbd5e1", "No Trumps": "#a855f7",
+};
+const SUIT_SYM = { Clubs: "♣", Diamonds: "♦", Hearts: "♥", Spades: "♠", "No Trumps": "NT" };
+const SUIT_CLASS = { Clubs: "suit-c", Diamonds: "suit-d", Hearts: "suit-h", Spades: "suit-s", "No Trumps": "suit-n" };
+
+Chart.defaults.color = "#8b94b8";
+Chart.defaults.borderColor = "#232c4d";
+Chart.defaults.font.family = "Inter, sans-serif";
+Chart.defaults.font.size = 11;
+Chart.defaults.plugins.legend.labels.usePointStyle = true;
+Chart.defaults.plugins.legend.labels.boxWidth = 8;
+Chart.defaults.plugins.legend.labels.padding = 14;
+Chart.defaults.plugins.tooltip.backgroundColor = "#0b0f1c";
+Chart.defaults.plugins.tooltip.borderColor = "#232c4d";
+Chart.defaults.plugins.tooltip.borderWidth = 1;
+Chart.defaults.plugins.tooltip.padding = 10;
+Chart.defaults.plugins.tooltip.titleFont = { weight: 700 };
+
+/* ---------- Data prep ---------- */
+const ROWS = window.DATA.filter(r => r.player && r.date && r.hand);
+document.getElementById("row-count").textContent = ROWS.length.toLocaleString();
+
+// Index by (date, hand) — hand numbers were reused across early sessions
+const handKey = r => `${r.date}|${r.hand}`;
+const HANDS = {};
+ROWS.forEach(r => {
+  const k = handKey(r);
+  const h = HANDS[k] ||= { key: k, hand: r.hand, date: r.date, players: {}, declarer: null, suit: null, ctricks: null, made: null, doubled: null };
+  h.players[r.player] = r;
+  if (r.declarer) {
+    h.declarer = r.declarer;
+    h.suit = r.suit;
+    h.ctricks = r.ctricks;
+    h.made = r.made;
+    h.doubled = r.doubled;
+  }
+});
+const HAND_LIST = Object.values(HANDS).sort((a,b) => a.date.localeCompare(b.date) || a.hand - b.hand);
+const ALL_DATES = [...new Set(ROWS.map(r => r.date))].sort();
+const DATE_LABEL = d => {
+  const [y,m,da] = d.split("-");
+  return `${da}/${m}/${y.slice(2)}`;
 };
 
-Chart.defaults.color = "#9aa6c0";
-Chart.defaults.borderColor = "#2a3a5e";
-Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-
-// Parse "dd/mm/yyyy" to Date for sorting
-function parseDate(s) {
-  const [d, m, y] = s.split("/");
-  return new Date(`${y}-${m}-${d}`);
-}
-function fmtDate(s) { return s; }
-
-const ROWS = window.DATA;
-document.getElementById("row-count").textContent = ROWS.length;
-
-// Build unique sorted session list
-const ALL_DATES = [...new Set(ROWS.map(r => r.date))].sort((a, b) => parseDate(a) - parseDate(b));
+document.getElementById("meta").innerHTML =
+  `${HAND_LIST.length.toLocaleString()} hands across ${ALL_DATES.length} sessions<br>` +
+  `${DATE_LABEL(ALL_DATES[0])} – ${DATE_LABEL(ALL_DATES[ALL_DATES.length-1])}`;
 
 // Populate date filter
 const dateFilter = document.getElementById("date-filter");
 ALL_DATES.forEach(d => {
-  const opt = document.createElement("option");
-  opt.value = d;
-  opt.textContent = d;
-  dateFilter.appendChild(opt);
+  const o = document.createElement("option");
+  o.value = d; o.textContent = DATE_LABEL(d);
+  dateFilter.appendChild(o);
 });
 
-// State
+/* ---------- State + controls ---------- */
 const state = {
   players: new Set(PLAYERS),
   date: "",
   auction: "",
-  sortKey: "date",
-  sortDir: 1,
+  suit: "",
+  leagueSort: { k: "total", dir: -1 },
+  logSort: { k: "hand", dir: -1 },
+  logSearch: "",
 };
 
-// Wire up controls
-document.querySelectorAll(".player-chip").forEach(chip => {
-  chip.addEventListener("click", () => {
-    const p = chip.dataset.player;
-    if (state.players.has(p)) state.players.delete(p);
-    else state.players.add(p);
-    chip.classList.toggle("active");
-    if (state.players.size === 0) {
-      // re-enable to avoid empty state
-      state.players.add(p);
-      chip.classList.add("active");
-    }
-    render();
-  });
-});
+document.querySelectorAll(".chip").forEach(c => c.addEventListener("click", () => {
+  const p = c.dataset.player;
+  if (state.players.has(p) && state.players.size > 1) {
+    state.players.delete(p);
+    c.classList.remove("active");
+  } else if (!state.players.has(p)) {
+    state.players.add(p);
+    c.classList.add("active");
+  }
+  render();
+}));
 dateFilter.addEventListener("change", e => { state.date = e.target.value; render(); });
 document.getElementById("auction-filter").addEventListener("change", e => { state.auction = e.target.value; render(); });
+document.getElementById("suit-filter").addEventListener("change", e => { state.suit = e.target.value; render(); });
+document.getElementById("log-search").addEventListener("input", e => { state.logSearch = e.target.value.toLowerCase(); renderLog(); });
 
-document.querySelectorAll("#data-table th").forEach(th => {
-  th.addEventListener("click", () => {
-    const k = th.dataset.sort;
-    if (state.sortKey === k) state.sortDir *= -1;
-    else { state.sortKey = k; state.sortDir = 1; }
-    renderTable();
-  });
-});
+document.querySelectorAll("#league-table th").forEach(th => th.addEventListener("click", () => {
+  const k = th.dataset.k;
+  if (state.leagueSort.k === k) state.leagueSort.dir *= -1;
+  else { state.leagueSort.k = k; state.leagueSort.dir = -1; }
+  renderLeague();
+}));
+document.querySelectorAll("#log-table th").forEach(th => th.addEventListener("click", () => {
+  const k = th.dataset.k;
+  if (state.logSort.k === k) state.logSort.dir *= -1;
+  else { state.logSort.k = k; state.logSort.dir = 1; }
+  renderLog();
+}));
 
+/* ---------- Filtering ---------- */
 function filterRows() {
   return ROWS.filter(r => {
     if (!state.players.has(r.player)) return false;
     if (state.date && r.date !== state.date) return false;
-    if (state.auction === "yes" && !r.wonAuction) return false;
-    if (state.auction === "no" && r.wonAuction) return false;
+    if (state.auction === "declared" && !r.won) return false;
+    if (state.auction === "defended" && r.won) return false;
+    if (state.suit) {
+      const h = HANDS[handKey(r)];
+      if (!h || h.suit !== state.suit) return false;
+    }
     return true;
   });
 }
 
-// ---- Charts ----
-const charts = {};
+/* ---------- Helpers ---------- */
+const sum = a => a.reduce((s,x) => s+x, 0);
+const avg = a => a.length ? sum(a) / a.length : 0;
+const fmt = n => Math.round(n).toLocaleString();
+const made = h => h.ctricks != null && h.made != null && h.made >= h.ctricks + 6;
 
-function makeChart(id, config) {
+/* ---------- Hero ---------- */
+function renderHero() {
+  const latestHand = HAND_LIST[HAND_LIST.length - 1];
+  document.getElementById("latest-date").textContent =
+    new Date(latestHand.date).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  document.getElementById("latest-hand").textContent = "#" + latestHand.hand;
+  const declarerName = latestHand.declarer || "—";
+  // Find partner (other Yes)
+  const partner = Object.values(latestHand.players).find(p => p.won && p.player !== latestHand.declarer);
+  document.getElementById("latest-declarer").innerHTML =
+    latestHand.declarer
+      ? `<span class="pname" data-p="${latestHand.declarer}">${latestHand.declarer}</span>` +
+        (partner ? ` <span class="pair-badge">+ ${partner.player}</span>` : "")
+      : "—";
+  document.getElementById("latest-contract").innerHTML =
+    latestHand.ctricks
+      ? `${latestHand.ctricks} <span class="${SUIT_CLASS[latestHand.suit]||""}">${SUIT_SYM[latestHand.suit]||latestHand.suit}</span>${latestHand.doubled === "Yes" ? " ×" : ""}`
+      : "—";
+  document.getElementById("latest-made").textContent = latestHand.made ?? "—";
+  if (latestHand.ctricks && latestHand.made != null) {
+    const diff = latestHand.made - (latestHand.ctricks + 6);
+    let txt = "Made exactly";
+    let cls = "pill made";
+    if (diff > 0) { txt = `+${diff} over`; cls = "pill over"; }
+    else if (diff < 0) { txt = `${diff} down`; cls = "pill down"; }
+    document.getElementById("latest-result").innerHTML = `<span class="${cls}">${txt}</span>`;
+  } else {
+    document.getElementById("latest-result").textContent = "—";
+  }
+  // Scores — each player records the same side-score; pick any one
+  const declRow = Object.values(latestHand.players).find(p => p.won);
+  const defRow  = Object.values(latestHand.players).find(p => !p.won);
+  document.getElementById("latest-score").innerHTML =
+    `Declaring <strong>${fmt(declRow?.pts || 0)}</strong> · Defending <strong>${fmt(defRow?.pts || 0)}</strong>`;
+
+  // Standings
+  const totals = {};
+  PLAYERS.forEach(p => totals[p] = sum(ROWS.filter(r => r.player === p).map(r => r.pts)));
+  const sorted = PLAYERS.slice().sort((a,b) => totals[b] - totals[a]);
+  // last session totals
+  const lastDate = ALL_DATES[ALL_DATES.length - 1];
+  const lastSession = {};
+  PLAYERS.forEach(p => lastSession[p] = sum(ROWS.filter(r => r.player === p && r.date === lastDate).map(r => r.pts)));
+  document.getElementById("standings").innerHTML = sorted.map((p, i) => `
+    <div class="standing" data-p="${p}">
+      <div class="name">${["1st","2nd","3rd","4th"][i]} · ${p}</div>
+      <div>
+        <div class="total">${fmt(totals[p])}</div>
+        <div class="delta ${lastSession[p] > 0 ? 'up' : lastSession[p] < 0 ? 'down' : ''}">
+          ${lastSession[p] > 0 ? "+" : ""}${fmt(lastSession[p])} last session
+        </div>
+      </div>
+    </div>
+  `).join("");
+}
+
+/* ---------- League table ---------- */
+function playerStats(rows) {
+  const stats = {};
+  PLAYERS.forEach(p => {
+    const pr = rows.filter(r => r.player === p);
+    const total = sum(pr.map(r => r.pts));
+    const hands = pr.length;
+    const hcps = pr.filter(r => r.hcp != null).map(r => r.hcp);
+    const sessions = [...new Set(pr.map(r => r.date))];
+    const sessionTotals = sessions.map(d => ({ d, t: sum(pr.filter(r => r.date === d).map(r => r.pts)) }));
+    const best = sessionTotals.reduce((m, s) => s.t > (m?.t ?? -Infinity) ? s : m, null);
+    const worst = sessionTotals.reduce((m, s) => s.t < (m?.t ?? Infinity) ? s : m, null);
+    const declHands = pr.filter(r => r.declarer === p && r.ctricks != null && r.made != null);
+    const declMade = declHands.filter(r => r.made >= r.ctricks + 6).length;
+    // recent trend: last 6 session totals
+    const trend = sessionTotals.slice(-12).map(s => s.t);
+    stats[p] = {
+      player: p,
+      total,
+      perHand: hands ? total / hands : 0,
+      perSession: sessions.length ? total / sessions.length : 0,
+      hands,
+      avgHcp: avg(hcps),
+      totalHcp: sum(hcps),
+      efficiency: sum(hcps) ? total / sum(hcps) : 0,
+      declCount: declHands.length,
+      declRate: declHands.length ? declMade / declHands.length : 0,
+      best: best ? best.t : 0,
+      bestDate: best ? best.d : "",
+      worst: worst ? worst.t : 0,
+      worstDate: worst ? worst.d : "",
+      trend,
+    };
+  });
+  return stats;
+}
+
+function renderLeague() {
+  const rows = filterRows();
+  const stats = playerStats(rows);
+  let list = Object.values(stats).filter(s => state.players.has(s.player));
+  const { k, dir } = state.leagueSort;
+  list.sort((a, b) => {
+    const av = a[k], bv = b[k];
+    if (typeof av === "string") return dir * av.localeCompare(bv);
+    return dir * ((av || 0) - (bv || 0));
+  });
+  const max = { total: 1, perHand: 1, perSession: 1, efficiency: 1 };
+  Object.values(stats).forEach(s => {
+    if (s.total > max.total) max.total = s.total;
+    if (s.perHand > max.perHand) max.perHand = s.perHand;
+    if (s.perSession > max.perSession) max.perSession = s.perSession;
+    if (s.efficiency > max.efficiency) max.efficiency = s.efficiency;
+  });
+  const tbody = document.querySelector("#league-table tbody");
+  tbody.innerHTML = list.map(s => `
+    <tr>
+      <td class="player">
+        <span class="swatch" style="background:${PCOL[s.player]}"></span>
+        ${s.player}
+      </td>
+      <td><span class="bar-cell"><span class="fill" style="width:${(s.total/max.total)*100}%;background:${PCOL[s.player]}"></span></span> <strong>${fmt(s.total)}</strong></td>
+      <td>${s.perHand.toFixed(1)}</td>
+      <td>${fmt(s.perSession)}</td>
+      <td>${s.hands}</td>
+      <td>${s.avgHcp.toFixed(2)}</td>
+      <td>${s.efficiency.toFixed(2)}</td>
+      <td>${s.declCount}</td>
+      <td>${(s.declRate*100).toFixed(0)}%</td>
+      <td>${fmt(s.best)}<div style="font-size:10px;color:var(--muted);">${s.bestDate ? DATE_LABEL(s.bestDate) : ""}</div></td>
+      <td>${fmt(s.worst)}<div style="font-size:10px;color:var(--muted);">${s.worstDate ? DATE_LABEL(s.worstDate) : ""}</div></td>
+      <td><span class="bar-cell" style="width:80px;background:transparent"><canvas data-trend="${s.player}" width="80" height="22"></canvas></span></td>
+    </tr>
+  `).join("");
+  // Sparklines
+  list.forEach(s => {
+    const cv = tbody.querySelector(`canvas[data-trend="${s.player}"]`);
+    if (!cv) return;
+    const ctx = cv.getContext("2d");
+    ctx.clearRect(0,0,80,22);
+    if (!s.trend.length) return;
+    const max = Math.max(...s.trend), min = Math.min(...s.trend), range = max-min || 1;
+    ctx.strokeStyle = PCOL[s.player]; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    s.trend.forEach((v, i) => {
+      const x = (i/(s.trend.length-1||1))*78 + 1;
+      const y = 21 - ((v - min)/range)*20;
+      if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+  });
+}
+
+/* ---------- Charts ---------- */
+const charts = {};
+function make(id, cfg) {
   if (charts[id]) charts[id].destroy();
   const ctx = document.getElementById(id).getContext("2d");
-  charts[id] = new Chart(ctx, config);
+  charts[id] = new Chart(ctx, cfg);
 }
 
-function renderKPIs(rows) {
-  const grid = document.getElementById("kpi-grid");
-  grid.innerHTML = "";
-  const players = [...state.players].sort();
-  players.forEach(p => {
-    const pr = rows.filter(r => r.player === p);
-    const total = pr.reduce((s, r) => s + r.points, 0);
-    const hands = pr.length;
-    const avgHcp = hands ? (pr.reduce((s, r) => s + (r.hcp || 0), 0) / hands) : 0;
-    const avgPts = hands ? total / hands : 0;
-    const decl = pr.filter(r => r.declarer === p);
-    const declMade = decl.filter(r => r.tricksMade != null && r.contractTricks != null && r.tricksMade >= r.contractTricks + 6).length;
-    const declRate = decl.length ? (declMade / decl.length * 100).toFixed(0) + "%" : "—";
-    const card = document.createElement("div");
-    card.className = "kpi";
-    card.dataset.player = p;
-    card.innerHTML = `
-      <h3>${p}</h3>
-      <div class="kpi-stats">
-        <div class="kpi-stat"><div class="label">Total points</div><div class="value">${total.toLocaleString()}</div></div>
-        <div class="kpi-stat"><div class="label">Hands played</div><div class="value">${hands}</div></div>
-        <div class="kpi-stat"><div class="label">Avg HCP</div><div class="value">${avgHcp.toFixed(1)}</div></div>
-        <div class="kpi-stat"><div class="label">Avg pts / hand</div><div class="value">${avgPts.toFixed(0)}</div></div>
-        <div class="kpi-stat"><div class="label">Hands as declarer</div><div class="value">${decl.length}</div></div>
-        <div class="kpi-stat"><div class="label">Contracts made</div><div class="value">${declRate}</div></div>
-      </div>`;
-    grid.appendChild(card);
-  });
-}
-
-function renderCumulative(rows) {
+function renderCum(rows) {
   const dates = state.date ? [state.date] : ALL_DATES;
-  const players = [...state.players].sort();
-  // Sum points per (player, date)
-  const totals = {};
-  players.forEach(p => totals[p] = {});
-  rows.forEach(r => {
-    if (!totals[r.player]) return;
-    totals[r.player][r.date] = (totals[r.player][r.date] || 0) + r.points;
-  });
-  const datasets = players.map(p => {
+  const datasets = PLAYERS.filter(p => state.players.has(p)).map(p => {
     let running = 0;
     const data = dates.map(d => {
-      running += (totals[p][d] || 0);
+      running += sum(rows.filter(r => r.player === p && r.date === d).map(r => r.pts));
       return running;
     });
     return {
       label: p,
       data,
-      borderColor: PLAYER_COLORS[p],
-      backgroundColor: PLAYER_COLORS[p] + "33",
-      tension: 0.25,
+      borderColor: PCOL[p],
+      backgroundColor: PCOL[p] + "20",
+      tension: 0.3,
+      borderWidth: 2,
+      pointRadius: 0,
+      pointHoverRadius: 5,
       fill: false,
-      pointRadius: 3,
     };
   });
-  makeChart("cumulativeChart", {
+  make("cumChart", {
     type: "line",
-    data: { labels: dates, datasets },
+    data: { labels: dates.map(DATE_LABEL), datasets },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { position: "bottom" } },
-      scales: { y: { beginAtZero: true, ticks: { callback: v => v.toLocaleString() } } },
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { position: "bottom" },
+      },
+      scales: {
+        y: { beginAtZero: true, grid: { color: "rgba(255,255,255,0.04)" }, ticks: { callback: v => v.toLocaleString() } },
+        x: { grid: { display: false }, ticks: { maxRotation: 60, minRotation: 0, autoSkip: true } },
+      },
     },
   });
 }
 
-function renderTotal(rows) {
-  const players = [...state.players].sort();
-  const totals = players.map(p => rows.filter(r => r.player === p).reduce((s, r) => s + r.points, 0));
-  makeChart("totalChart", {
+function renderSessionWins() {
+  // For each session, who scored most?
+  const wins = { Caroline: 0, David: 0, Hamish: 0, Vivienne: 0 };
+  const ties = { Caroline: 0, David: 0, Hamish: 0, Vivienne: 0 };
+  ALL_DATES.forEach(d => {
+    const totals = {};
+    PLAYERS.forEach(p => totals[p] = sum(ROWS.filter(r => r.player === p && r.date === d).map(r => r.pts)));
+    const max = Math.max(...Object.values(totals));
+    const winners = PLAYERS.filter(p => totals[p] === max);
+    if (winners.length === 1) wins[winners[0]]++;
+    else winners.forEach(p => ties[p]++);
+  });
+  const list = PLAYERS.filter(p => state.players.has(p));
+  make("sessionWinsChart", {
     type: "bar",
     data: {
-      labels: players,
-      datasets: [{
-        data: totals,
-        backgroundColor: players.map(p => PLAYER_COLORS[p]),
-      }],
+      labels: list,
+      datasets: [
+        { label: "Outright wins", data: list.map(p => wins[p]), backgroundColor: list.map(p => PCOL[p]) },
+        { label: "Tied for top",  data: list.map(p => ties[p]), backgroundColor: list.map(p => PCOL[p] + "55") },
+      ],
     },
     options: {
+      responsive: true, maintainAspectRatio: false,
       indexAxis: "y",
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: { x: { beginAtZero: true, ticks: { callback: v => v.toLocaleString() } } },
+      plugins: { legend: { position: "bottom" } },
+      scales: {
+        x: { stacked: true, beginAtZero: true, grid: { color: "rgba(255,255,255,0.04)" } },
+        y: { stacked: true, grid: { display: false } },
+      },
     },
   });
 }
 
 function renderPerSession(rows) {
   const dates = state.date ? [state.date] : ALL_DATES;
-  const players = [...state.players].sort();
+  const players = PLAYERS.filter(p => state.players.has(p));
   const datasets = players.map(p => ({
     label: p,
-    data: dates.map(d => rows.filter(r => r.player === p && r.date === d).reduce((s, r) => s + r.points, 0)),
-    backgroundColor: PLAYER_COLORS[p],
+    data: dates.map(d => sum(rows.filter(r => r.player === p && r.date === d).map(r => r.pts))),
+    backgroundColor: PCOL[p],
+    borderRadius: 4,
   }));
-  makeChart("perSessionChart", {
+  make("perSessionChart", {
     type: "bar",
-    data: { labels: dates, datasets },
+    data: { labels: dates.map(DATE_LABEL), datasets },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
+      responsive: true, maintainAspectRatio: false,
       plugins: { legend: { position: "bottom" } },
-      scales: { y: { beginAtZero: true, ticks: { callback: v => v.toLocaleString() } } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: "rgba(255,255,255,0.04)" }, ticks: { callback: v => v.toLocaleString() } },
+        x: { grid: { display: false }, ticks: { maxRotation: 60, autoSkip: true } },
+      },
     },
   });
 }
 
-function renderHcpAvg(rows) {
-  const players = [...state.players].sort();
-  const data = players.map(p => {
-    const pr = rows.filter(r => r.player === p && r.hcp != null);
-    return pr.length ? pr.reduce((s, r) => s + r.hcp, 0) / pr.length : 0;
+function renderHcpSession(rows) {
+  const dates = state.date ? [state.date] : ALL_DATES;
+  const players = PLAYERS.filter(p => state.players.has(p));
+  const datasets = players.map(p => ({
+    label: p,
+    data: dates.map(d => {
+      const arr = rows.filter(r => r.player === p && r.date === d && r.hcp != null).map(r => r.hcp);
+      return arr.length ? avg(arr) : null;
+    }),
+    borderColor: PCOL[p],
+    backgroundColor: PCOL[p] + "30",
+    tension: 0.3,
+    borderWidth: 2,
+    pointRadius: 0,
+    pointHoverRadius: 4,
+    fill: false,
+  }));
+  datasets.push({
+    label: "Expected (10)",
+    data: dates.map(() => 10),
+    borderColor: "#5b6588",
+    borderDash: [4, 4],
+    borderWidth: 1.5,
+    pointRadius: 0,
+    fill: false,
   });
-  makeChart("hcpAvgChart", {
-    type: "bar",
-    data: {
-      labels: players,
-      datasets: [{
-        label: "Avg HCP",
-        data,
-        backgroundColor: players.map(p => PLAYER_COLORS[p]),
-      }, {
-        label: "Expected (10)",
-        data: players.map(() => 10),
-        type: "line",
-        borderColor: "#9aa6c0",
-        borderDash: [4, 4],
-        pointRadius: 0,
-        fill: false,
-      }],
-    },
+  make("hcpSessionChart", {
+    type: "line",
+    data: { labels: dates.map(DATE_LABEL), datasets },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
       plugins: { legend: { position: "bottom" } },
-      scales: { y: { beginAtZero: true, max: 20 } },
+      scales: {
+        y: { grid: { color: "rgba(255,255,255,0.04)" }, suggestedMin: 6, suggestedMax: 14 },
+        x: { grid: { display: false }, ticks: { maxRotation: 60, autoSkip: true } },
+      },
     },
   });
 }
 
 function renderHcpDist(rows) {
-  // Buckets: 0-4, 5-9, 10-14, 15-19, 20+
   const buckets = ["0–4", "5–9", "10–14", "15–19", "20+"];
-  function bucketOf(h) {
-    if (h < 5) return 0;
-    if (h < 10) return 1;
-    if (h < 15) return 2;
-    if (h < 20) return 3;
-    return 4;
-  }
-  const players = [...state.players].sort();
+  const players = PLAYERS.filter(p => state.players.has(p));
+  function bo(h) { return h < 5 ? 0 : h < 10 ? 1 : h < 15 ? 2 : h < 20 ? 3 : 4; }
   const datasets = players.map(p => {
-    const counts = [0, 0, 0, 0, 0];
-    rows.filter(r => r.player === p && r.hcp != null).forEach(r => counts[bucketOf(r.hcp)]++);
-    return {
-      label: p,
-      data: counts,
-      backgroundColor: PLAYER_COLORS[p],
-    };
+    const c = [0,0,0,0,0];
+    rows.filter(r => r.player === p && r.hcp != null).forEach(r => c[bo(r.hcp)]++);
+    return { label: p, data: c, backgroundColor: PCOL[p], borderRadius: 4 };
   });
-  makeChart("hcpDistChart", {
+  make("hcpDistChart", {
     type: "bar",
     data: { labels: buckets, datasets },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
+      responsive: true, maintainAspectRatio: false,
       plugins: { legend: { position: "bottom" } },
-      scales: { x: { title: { display: true, text: "HCP range" } }, y: { beginAtZero: true, title: { display: true, text: "# hands" } } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: "rgba(255,255,255,0.04)" } },
+        x: { grid: { display: false }, title: { display: true, text: "HCP bucket" } },
+      },
+    },
+  });
+}
+
+function renderEfficiency(rows) {
+  const players = PLAYERS.filter(p => state.players.has(p));
+  const data = players.map(p => {
+    const pr = rows.filter(r => r.player === p);
+    const totalHcp = sum(pr.map(r => r.hcp || 0));
+    const total = sum(pr.map(r => r.pts));
+    return totalHcp ? total / totalHcp : 0;
+  });
+  make("efficiencyChart", {
+    type: "bar",
+    data: {
+      labels: players,
+      datasets: [{
+        label: "Pts per HCP",
+        data,
+        backgroundColor: players.map(p => PCOL[p]),
+        borderRadius: 6,
+      }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      indexAxis: "y",
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.parsed.x.toFixed(2) + " pts / HCP" } } },
+      scales: {
+        x: { beginAtZero: true, grid: { color: "rgba(255,255,255,0.04)" } },
+        y: { grid: { display: false } },
+      },
     },
   });
 }
 
 function renderScatter(rows) {
-  const players = [...state.players].sort();
+  const players = PLAYERS.filter(p => state.players.has(p));
   const datasets = players.map(p => ({
     label: p,
-    data: rows
-      .filter(r => r.player === p && r.hcp != null)
-      .map(r => ({ x: r.hcp, y: r.points, date: r.date, hand: r.hand })),
-    backgroundColor: PLAYER_COLORS[p] + "cc",
-    borderColor: PLAYER_COLORS[p],
-    pointRadius: 5,
+    data: rows.filter(r => r.player === p && r.hcp != null).map(r => ({
+      x: r.hcp, y: r.pts, date: r.date, hand: r.hand,
+    })),
+    backgroundColor: PCOL[p] + "aa",
+    borderColor: PCOL[p],
+    pointRadius: 3,
+    pointHoverRadius: 6,
   }));
-  makeChart("scatterChart", {
+  make("scatterChart", {
     type: "scatter",
     data: { datasets },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
+      responsive: true, maintainAspectRatio: false,
       plugins: {
         legend: { position: "bottom" },
-        tooltip: {
-          callbacks: {
-            label: c => `${c.dataset.label}: HCP ${c.raw.x}, pts ${c.raw.y} (${c.raw.date} #${c.raw.hand})`,
-          },
-        },
+        tooltip: { callbacks: { label: c => `${c.dataset.label}: HCP ${c.raw.x} → ${c.raw.y} pts (${DATE_LABEL(c.raw.date)} #${c.raw.hand})` } },
       },
       scales: {
-        x: { title: { display: true, text: "HCP" }, beginAtZero: true },
-        y: { title: { display: true, text: "Points" } },
+        x: { beginAtZero: true, title: { display: true, text: "HCP" }, grid: { color: "rgba(255,255,255,0.04)" } },
+        y: { title: { display: true, text: "Points" }, grid: { color: "rgba(255,255,255,0.04)" } },
       },
     },
   });
 }
 
 function renderDeclarer(rows) {
-  const players = [...state.players].sort();
-  const made = [], down = [];
+  const players = PLAYERS.filter(p => state.players.has(p));
+  const made = [], exact = [], down = [], over = [];
   players.forEach(p => {
-    const decl = rows.filter(r => r.declarer === p && r.contractTricks != null && r.tricksMade != null);
-    const m = decl.filter(r => r.tricksMade >= r.contractTricks + 6).length;
-    const d = decl.length - m;
-    made.push(m); down.push(d);
+    const decl = rows.filter(r => r.declarer === p && r.ctricks != null && r.made != null);
+    let m = 0, e = 0, d = 0, o = 0;
+    decl.forEach(r => {
+      const diff = r.made - (r.ctricks + 6);
+      if (diff > 0) o++;
+      else if (diff === 0) e++;
+      else d++;
+    });
+    over.push(o); exact.push(e); down.push(d);
   });
-  makeChart("declarerChart", {
+  make("declarerChart", {
     type: "bar",
     data: {
       labels: players,
       datasets: [
-        { label: "Contracts made", data: made, backgroundColor: "#10b981" },
-        { label: "Went down", data: down, backgroundColor: "#ef4444" },
+        { label: "Over-tricks",  data: over,  backgroundColor: "#7c9cff", borderRadius: 4 },
+        { label: "Made exactly", data: exact, backgroundColor: "#2ec4b6", borderRadius: 4 },
+        { label: "Went down",    data: down,  backgroundColor: "#ef5675", borderRadius: 4 },
       ],
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
+      responsive: true, maintainAspectRatio: false,
       plugins: { legend: { position: "bottom" } },
-      scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
+      scales: {
+        x: { stacked: true, grid: { display: false } },
+        y: { stacked: true, beginAtZero: true, grid: { color: "rgba(255,255,255,0.04)" } },
+      },
     },
   });
 }
 
 function renderSuit(rows) {
-  // Use rows that have a suit (i.e. contracts). De-dupe per (date, hand) to avoid 4x counting.
   const seen = new Set();
   const counts = {};
   rows.forEach(r => {
-    if (!r.suit) return;
-    const k = `${r.date}|${r.hand}`;
-    if (seen.has(k)) return;
-    seen.add(k);
-    counts[r.suit] = (counts[r.suit] || 0) + 1;
+    const h = HANDS[handKey(r)];
+    if (!h || !h.suit) return;
+    if (seen.has(h.key)) return;
+    seen.add(h.key);
+    counts[h.suit] = (counts[h.suit] || 0) + 1;
   });
-  const labels = Object.keys(counts);
-  makeChart("suitChart", {
+  const labels = Object.keys(counts).sort((a,b) => counts[b]-counts[a]);
+  make("suitChart", {
     type: "doughnut",
     data: {
       labels,
       datasets: [{
         data: labels.map(s => counts[s]),
-        backgroundColor: labels.map(s => SUIT_COLORS[s] || "#6ea8fe"),
+        backgroundColor: labels.map(s => SCOL[s] || "#7c9cff"),
+        borderColor: "#0b0f1c",
+        borderWidth: 2,
       }],
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
+      responsive: true, maintainAspectRatio: false,
+      cutout: "60%",
       plugins: { legend: { position: "right" } },
     },
   });
 }
 
-function renderTable() {
-  const rows = filterRows();
-  const sortKey = state.sortKey;
-  const dir = state.sortDir;
-  const sorted = [...rows].sort((a, b) => {
-    let av, bv;
-    if (sortKey === "date") { av = parseDate(a.date); bv = parseDate(b.date); }
-    else if (sortKey === "contract") {
-      av = `${a.contractTricks || ""} ${a.suit || ""}`;
-      bv = `${b.contractTricks || ""} ${b.suit || ""}`;
-    } else if (sortKey === "made") { av = a.tricksMade ?? -1; bv = b.tricksMade ?? -1; }
-    else { av = a[sortKey] ?? ""; bv = b[sortKey] ?? ""; }
-    if (av < bv) return -1 * dir;
-    if (av > bv) return 1 * dir;
-    return 0;
+/* ---------- Partnership matrix ---------- */
+function renderPartnerships(rows) {
+  const pairings = [];
+  for (let i = 0; i < PLAYERS.length; i++) {
+    for (let j = i+1; j < PLAYERS.length; j++) {
+      pairings.push([PLAYERS[i], PLAYERS[j]]);
+    }
+  }
+  // For each pairing, find hands where they were partners on declaring side (both won)
+  const stats = pairings.map(([a, b]) => {
+    let declHands = 0, declMade = 0, declPts = 0, defHands = 0, defPts = 0;
+    HAND_LIST.forEach(h => {
+      const pa = h.players[a], pb = h.players[b];
+      if (!pa || !pb) return;
+      // Each player records the side-score, so just take one (pa.pts == pb.pts for the same side)
+      if (pa.won && pb.won) {
+        declHands++;
+        declPts += pa.pts;
+        if (h.ctricks != null && h.made != null && h.made >= h.ctricks + 6) declMade++;
+      } else if (!pa.won && !pb.won) {
+        defHands++;
+        defPts += pa.pts;
+      }
+    });
+    return { a, b, declHands, declMade, declPts, defHands, defPts, net: declPts + defPts };
   });
-  const tbody = document.querySelector("#data-table tbody");
-  tbody.innerHTML = sorted.map(r => {
-    const contract = r.contractTricks ? `${r.contractTricks} ${r.suit || ""}` : "—";
-    return `<tr>
-      <td>${r.date}</td>
-      <td class="num">${r.hand}</td>
-      <td style="color:${PLAYER_COLORS[r.player]};font-weight:600">${r.player}</td>
-      <td class="num">${r.hcp ?? ""}</td>
-      <td><span class="pill ${r.wonAuction ? "yes" : "no"}">${r.wonAuction ? "Yes" : "No"}</span></td>
-      <td>${r.declarer ?? "—"}</td>
-      <td>${contract}</td>
-      <td class="num">${r.tricksMade ?? "—"}</td>
-      <td class="num">${r.points.toLocaleString()}</td>
-    </tr>`;
-  }).join("");
+  const max = Math.max(...stats.map(s => s.net));
+  document.getElementById("pair-matrix").innerHTML = stats.map(s => `
+    <div class="pair-card">
+      <div class="pair-name">
+        <span class="swatch-sm" style="background:${PCOL[s.a]}"></span>${s.a}
+        <span style="color:var(--muted);">+</span>
+        <span class="swatch-sm" style="background:${PCOL[s.b]}"></span>${s.b}
+      </div>
+      <div class="pair-stats">
+        <div class="pair-stat"><div class="k">Net points</div><div class="v" style="color:${s.net === max ? 'var(--vivienne)' : 'var(--text)'}">${fmt(s.net)}</div></div>
+        <div class="pair-stat"><div class="k">As declarers</div><div class="v">${s.declHands}</div></div>
+        <div class="pair-stat"><div class="k">Made when decl.</div><div class="v">${s.declHands ? ((s.declMade/s.declHands)*100).toFixed(0) + "%" : "—"}</div></div>
+        <div class="pair-stat"><div class="k">Pts as declarer</div><div class="v">${fmt(s.declPts)}</div></div>
+        <div class="pair-stat"><div class="k">As defenders</div><div class="v">${s.defHands}</div></div>
+        <div class="pair-stat"><div class="k">Pts as defender</div><div class="v">${fmt(s.defPts)}</div></div>
+      </div>
+    </div>
+  `).join("");
 }
 
+/* ---------- Records ---------- */
+function renderRecords(rows) {
+  if (!rows.length) {
+    document.getElementById("records").innerHTML = '<div class="record-card"><div class="label">No data</div></div>';
+    return;
+  }
+  const topHand = rows.slice().sort((a,b) => b.pts - a.pts)[0];
+  const worstHand = rows.slice().sort((a,b) => a.pts - b.pts)[0];
+
+  // Session totals across filter
+  const sessKey = (r) => `${r.player}|${r.date}`;
+  const sessTotals = {};
+  rows.forEach(r => {
+    const k = sessKey(r);
+    sessTotals[k] = (sessTotals[k] || 0) + r.pts;
+  });
+  const topSession = Object.entries(sessTotals).sort((a,b) => b[1] - a[1])[0];
+  const topSessionPlayer = topSession[0].split("|")[0];
+  const topSessionDate = topSession[0].split("|")[1];
+
+  // Big slam attempts (ctricks 6 or 7)
+  const slamRows = rows.filter(r => r.ctricks >= 6 && r.declarer === r.player);
+  const slamsMade = slamRows.filter(r => r.made >= r.ctricks + 6).length;
+
+  // Best partnership in filtered data: pair with max net pts
+  const pairings = [];
+  for (let i = 0; i < PLAYERS.length; i++) for (let j = i+1; j < PLAYERS.length; j++) pairings.push([PLAYERS[i], PLAYERS[j]]);
+  let topPair = null, topPairNet = -Infinity;
+  pairings.forEach(([a,b]) => {
+    if (!state.players.has(a) || !state.players.has(b)) return;
+    let net = 0;
+    HAND_LIST.forEach(h => {
+      const pa = h.players[a], pb = h.players[b];
+      if (!pa || !pb) return;
+      if (state.date && h.date !== state.date) return;
+      if (state.suit && h.suit !== state.suit) return;
+      if ((pa.won && pb.won) || (!pa.won && !pb.won)) net += pa.pts;
+    });
+    if (net > topPairNet) { topPairNet = net; topPair = [a, b]; }
+  });
+
+  const cards = [
+    {
+      label: "Biggest single hand",
+      value: fmt(topHand.pts),
+      meta: `<span class="pname" data-p="${topHand.player}">${topHand.player}</span> · ${DATE_LABEL(topHand.date)} · #${topHand.hand}`,
+    },
+    {
+      label: "Worst single hand",
+      value: fmt(worstHand.pts),
+      meta: `<span class="pname" data-p="${worstHand.player}">${worstHand.player}</span> · ${DATE_LABEL(worstHand.date)} · #${worstHand.hand}`,
+    },
+    {
+      label: "Best session for one player",
+      value: fmt(topSession[1]),
+      meta: `<span class="pname" data-p="${topSessionPlayer}">${topSessionPlayer}</span> · ${DATE_LABEL(topSessionDate)}`,
+    },
+    {
+      label: "Slam contracts",
+      value: `${slamsMade} / ${slamRows.length}`,
+      meta: slamRows.length ? `made small or grand slam` : "no slams in filter",
+    },
+    {
+      label: "Hottest pairing (net)",
+      value: topPair ? fmt(topPairNet) : "—",
+      meta: topPair ? `${topPair[0]} + ${topPair[1]}` : "—",
+    },
+    {
+      label: "Hands played",
+      value: fmt(new Set(rows.map(r => r.hand)).size),
+      meta: `${rows.length} player-entries`,
+    },
+    {
+      label: "Avg session total (table)",
+      value: fmt(sum(rows.map(r => r.pts)) / Math.max(1, new Set(rows.map(r => r.date)).size)),
+      meta: "across all selected players",
+    },
+    {
+      label: "Most-played suit",
+      value: (() => {
+        const c = {};
+        const seen = new Set();
+        rows.forEach(r => { const h = HANDS[handKey(r)]; if (h?.suit && !seen.has(h.key)) { seen.add(h.key); c[h.suit] = (c[h.suit]||0)+1; } });
+        const top = Object.entries(c).sort((a,b) => b[1]-a[1])[0];
+        return top ? `<span class="${SUIT_CLASS[top[0]]}">${SUIT_SYM[top[0]]}</span> ${top[0]}` : "—";
+      })(),
+      meta: "highest contract-suit frequency",
+    },
+  ];
+  document.getElementById("records").innerHTML = cards.map(c => `
+    <div class="record-card">
+      <div class="label">${c.label}</div>
+      <div class="value">${c.value}</div>
+      <div class="meta-line">${c.meta}</div>
+    </div>
+  `).join("");
+}
+
+/* ---------- Hand log ---------- */
+function renderLog() {
+  let rows = filterRows();
+  if (state.logSearch) {
+    const q = state.logSearch;
+    rows = rows.filter(r =>
+      r.player.toLowerCase().includes(q) ||
+      (r.declarer || "").toLowerCase().includes(q) ||
+      (HANDS[handKey(r)]?.suit || "").toLowerCase().includes(q)
+    );
+  }
+  document.getElementById("log-count").textContent = rows.length.toLocaleString();
+  const { k, dir } = state.logSort;
+  const get = (r, k) => {
+    const h = HANDS[handKey(r)];
+    switch (k) {
+      case "date": return r.date;
+      case "hand": return r.hand;
+      case "player": return r.player;
+      case "hcp": return r.hcp ?? -1;
+      case "role": return r.won ? "decl" : "def";
+      case "declarer": return r.declarer || "";
+      case "contract": return h?.ctricks || 0;
+      case "made": return r.made ?? -1;
+      case "result": {
+        if (!r.ctricks || r.made == null) return -99;
+        return r.made - r.ctricks - 6;
+      }
+      case "pts": return r.pts;
+    }
+  };
+  rows.sort((a, b) => {
+    const av = get(a, k), bv = get(b, k);
+    if (av < bv) return -dir;
+    if (av > bv) return dir;
+    return 0;
+  });
+  // limit render to 500 for perf
+  const limited = rows.slice(0, 500);
+  const tbody = document.querySelector("#log-table tbody");
+  tbody.innerHTML = limited.map(r => {
+    const h = HANDS[handKey(r)];
+    const role = r.won
+      ? (r.declarer === r.player ? `<span class="pill made">Declarer</span>` : `<span class="pill over">Dummy</span>`)
+      : `<span class="pill down">Defender</span>`;
+    const contract = h?.ctricks
+      ? `${h.ctricks} <span class="${SUIT_CLASS[h.suit]||""}">${SUIT_SYM[h.suit]||h.suit}</span>${h.doubled === "Yes" ? "×" : ""}`
+      : "—";
+    let result = "—";
+    if (h?.ctricks && r.made != null) {
+      const diff = r.made - h.ctricks - 6;
+      if (diff > 0) result = `<span class="pill over">+${diff}</span>`;
+      else if (diff === 0) result = `<span class="pill made">=</span>`;
+      else result = `<span class="pill down">${diff}</span>`;
+    }
+    return `<tr>
+      <td>${DATE_LABEL(r.date)}</td>
+      <td class="num">${r.hand}</td>
+      <td><span class="pname" data-p="${r.player}">${r.player}</span></td>
+      <td class="num">${r.hcp ?? ""}</td>
+      <td>${role}</td>
+      <td>${r.declarer ? `<span class="pname" data-p="${r.declarer}">${r.declarer}</span>` : "—"}</td>
+      <td>${contract}</td>
+      <td class="num">${r.made ?? "—"}</td>
+      <td>${result}</td>
+      <td class="num">${fmt(r.pts)}</td>
+    </tr>`;
+  }).join("") + (rows.length > 500 ? `<tr><td colspan="10" style="text-align:center;color:var(--muted);">… ${rows.length - 500} more rows hidden (use filters to narrow)</td></tr>` : "");
+}
+
+/* ---------- Render orchestrator ---------- */
 function render() {
   const rows = filterRows();
-  renderKPIs(rows);
-  renderCumulative(rows);
-  renderTotal(rows);
+  renderHero();
+  renderLeague();
+  renderCum(rows);
+  renderSessionWins();
   renderPerSession(rows);
-  renderHcpAvg(rows);
+  renderHcpSession(rows);
   renderHcpDist(rows);
+  renderEfficiency(rows);
   renderScatter(rows);
   renderDeclarer(rows);
   renderSuit(rows);
-  renderTable();
+  renderPartnerships(rows);
+  renderRecords(rows);
+  renderLog();
 }
 
 render();
