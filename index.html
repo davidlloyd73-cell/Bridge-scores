@@ -209,6 +209,21 @@
   }
   .bar-cell .fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); border-radius: 4px; }
 
+  /* ------- YEAR SUMMARY ------- */
+  .year-grid { display: grid; grid-template-columns: max-content repeat(var(--year-count, 2), 1fr); gap: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .year-grid .cell { padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .year-grid .cell.header { background: rgba(0,0,0,0.25); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 700; }
+  .year-grid .cell.player-cell { display: flex; align-items: center; gap: 10px; font-weight: 700; background: rgba(0,0,0,0.15); }
+  .year-grid .cell.player-cell .swatch { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .year-grid .cell.last-row { border-bottom: none; }
+  .year-grid .cell.ongoing { position: relative; }
+  .year-grid .cell.ongoing::after { content: 'ongoing'; position: absolute; top: 8px; right: 10px; font-size: 9px; padding: 1px 6px; border-radius: 8px; background: rgba(124,156,255,0.18); color: var(--accent); letter-spacing: 0.05em; }
+  .year-cell-main { font-size: 22px; font-weight: 800; }
+  .year-cell-sub { font-size: 11px; color: var(--muted); margin-top: 4px; display: flex; gap: 12px; flex-wrap: wrap; }
+  .year-cell-sub span strong { color: var(--text); font-weight: 600; }
+  .year-rank { display: inline-block; font-size: 10px; padding: 1px 5px; border-radius: 8px; background: var(--panel-2); color: var(--muted); margin-left: 6px; font-weight: 600; }
+  .year-rank.first { background: rgba(46,196,182,0.18); color: var(--vivienne); }
+
   /* ------- KPI CARDS ------- */
   .records-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
   @media (max-width: 900px) { .records-grid { grid-template-columns: 1fr 1fr; } }
@@ -285,6 +300,10 @@
     </div>
   </div>
   <div class="control">
+    <label>Year</label>
+    <select id="year-filter"><option value="">All years</option></select>
+  </div>
+  <div class="control">
     <label>Session</label>
     <select id="date-filter"><option value="">All sessions</option></select>
   </div>
@@ -329,6 +348,14 @@
       <div class="latest-eyebrow">Current standings · Grand total</div>
       <div class="standings" id="standings"></div>
     </div>
+  </div>
+
+  <!-- YEAR COMPARISON -->
+  <div class="panel span-12">
+    <p class="panel-title">Year-by-year</p>
+    <h2>Season summary <span style="color:var(--muted);font-weight:400;font-size:13px;">· each year side-by-side per player</span></h2>
+    <p class="help">All-time, ignoring the dashboard filters. Numbers refresh as new sessions are added to the form.</p>
+    <div id="year-summary"></div>
   </div>
 
   <!-- LEAGUE TABLE -->
@@ -547,9 +574,23 @@ ALL_DATES.forEach(d => {
   dateFilter.appendChild(o);
 });
 
+// Populate year filter (auto-detects from data)
+const ALL_YEARS = [...new Set(ROWS.map(r => r.date.slice(0,4)))].sort();
+const yearFilter = document.getElementById("year-filter");
+ALL_YEARS.forEach(y => {
+  const o = document.createElement("option");
+  o.value = y; o.textContent = y;
+  yearFilter.appendChild(o);
+});
+
+// Latest date — anything later than it is "ongoing"
+const LATEST_DATE = ALL_DATES[ALL_DATES.length - 1];
+const LATEST_YEAR = LATEST_DATE.slice(0, 4);
+
 /* ---------- State + controls ---------- */
 const state = {
   players: new Set(PLAYERS),
+  year: "",
   date: "",
   auction: "",
   suit: "",
@@ -569,6 +610,7 @@ document.querySelectorAll(".chip").forEach(c => c.addEventListener("click", () =
   }
   render();
 }));
+yearFilter.addEventListener("change", e => { state.year = e.target.value; render(); });
 dateFilter.addEventListener("change", e => { state.date = e.target.value; render(); });
 document.getElementById("auction-filter").addEventListener("change", e => { state.auction = e.target.value; render(); });
 document.getElementById("suit-filter").addEventListener("change", e => { state.suit = e.target.value; render(); });
@@ -591,6 +633,7 @@ document.querySelectorAll("#log-table th").forEach(th => th.addEventListener("cl
 function filterRows() {
   return ROWS.filter(r => {
     if (!state.players.has(r.player)) return false;
+    if (state.year && r.date.slice(0,4) !== state.year) return false;
     if (state.date && r.date !== state.date) return false;
     if (state.auction === "declared" && !r.won) return false;
     if (state.auction === "defended" && r.won) return false;
@@ -662,6 +705,64 @@ function renderHero() {
       </div>
     </div>
   `).join("");
+}
+
+/* ---------- Year summary ---------- */
+function renderYearSummary() {
+  const container = document.getElementById("year-summary");
+  container.style.setProperty("--year-count", ALL_YEARS.length);
+
+  // Compute per-player per-year stats (ignore dashboard filters — this is all-time)
+  const stats = {};
+  PLAYERS.forEach(p => { stats[p] = {}; ALL_YEARS.forEach(y => stats[p][y] = { total: 0, hands: 0, hcp: 0, sessions: new Set() }); });
+  ROWS.forEach(r => {
+    const y = r.date.slice(0, 4);
+    const s = stats[r.player]?.[y];
+    if (!s) return;
+    s.total += r.pts;
+    s.hands += 1;
+    s.hcp += r.hcp || 0;
+    s.sessions.add(r.date);
+  });
+
+  // Rank players within each year
+  const ranks = {};
+  ALL_YEARS.forEach(y => {
+    const ordered = PLAYERS.slice().sort((a, b) => stats[b][y].total - stats[a][y].total);
+    ranks[y] = {};
+    ordered.forEach((p, i) => ranks[y][p] = i + 1);
+  });
+
+  let html = `<div class="year-grid">`;
+  html += `<div class="cell header">Player</div>`;
+  ALL_YEARS.forEach(y => {
+    html += `<div class="cell header ${y === LATEST_YEAR && ALL_YEARS.length > 1 ? 'ongoing' : ''}">${y}</div>`;
+  });
+  PLAYERS.forEach((p, i) => {
+    const lastRow = i === PLAYERS.length - 1 ? "last-row" : "";
+    html += `<div class="cell player-cell ${lastRow}"><span class="swatch" style="background:${PCOL[p]}"></span>${p}</div>`;
+    ALL_YEARS.forEach(y => {
+      const s = stats[p][y];
+      const sessions = s.sessions.size;
+      const ph = s.hands ? s.total / s.hands : 0;
+      const ps = sessions ? s.total / sessions : 0;
+      const avgHcp = s.hands ? s.hcp / s.hands : 0;
+      const rank = ranks[y][p];
+      const rankCls = rank === 1 ? "first" : "";
+      html += `<div class="cell ${lastRow}">
+        <div class="year-cell-main">${fmt(s.total)} <span class="year-rank ${rankCls}">#${rank}</span></div>
+        <div class="year-cell-sub">
+          <span><strong>${sessions}</strong> session${sessions===1?'':'s'}</span>
+          <span><strong>${s.hands}</strong> hands</span>
+          <span><strong>${fmt(ph)}</strong> / hand</span>
+          <span><strong>${fmt(ps)}</strong> / session</span>
+          <span>avg HCP <strong>${avgHcp.toFixed(2)}</strong></span>
+        </div>
+      </div>`;
+    });
+  });
+  html += `</div>`;
+  container.innerHTML = html;
 }
 
 /* ---------- League table ---------- */
@@ -1266,6 +1367,7 @@ function renderLog() {
 function render() {
   const rows = filterRows();
   renderHero();
+  renderYearSummary();
   renderLeague();
   renderCum(rows);
   renderSessionWins();
