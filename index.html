@@ -97,6 +97,18 @@
     min-width: 160px;
   }
   select:focus, input:focus { outline: 2px solid var(--accent); }
+  .data-status { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; padding: 6px 11px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+  .data-status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted-2); flex: none; }
+  .data-status.loading { color: var(--accent); border-color: rgba(124,156,255,0.35); }
+  .data-status.loading .dot { background: var(--accent); }
+  .data-status.live { color: var(--vivienne); border-color: rgba(46,196,182,0.4); }
+  .data-status.live .dot { background: var(--vivienne); animation: pulse 2s infinite; }
+  .data-status.snapshot { color: var(--caroline); border-color: rgba(255,180,84,0.35); }
+  .data-status.snapshot .dot { background: var(--caroline); }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(46,196,182,0.45); } 70% { box-shadow: 0 0 0 6px rgba(46,196,182,0); } 100% { box-shadow: 0 0 0 0 rgba(46,196,182,0); } }
+  .refresh-btn { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .refresh-btn:active { transform: translateY(1px); }
 
   /* ------- LAYOUT ------- */
   .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 20px; }
@@ -326,6 +338,13 @@
       <option>No Trumps</option>
     </select>
   </div>
+  <div class="control" style="margin-left:auto;">
+    <label>Data feed</label>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <span id="data-status" class="data-status snapshot"><span class="dot"></span><span class="status-text">…</span></span>
+      <button id="refresh-btn" class="refresh-btn" title="Reload the latest rows from the sheet">&#x21bb; Refresh</button>
+    </div>
+  </div>
 </div>
 
 <div class="grid">
@@ -502,7 +521,7 @@
   </div>
 </div>
 
-<footer>Generated from the Google Form responses · <span id="row-count"></span> hand-entries · refresh after adding new sessions.</footer>
+<footer>Reads the Google Form responses live · <span id="row-count"></span> hand-entries · updates automatically as new hands are submitted.</footer>
 
 <script src="data.js"></script>
 <script>
@@ -536,56 +555,164 @@ Chart.defaults.plugins.tooltip.borderWidth = 1;
 Chart.defaults.plugins.tooltip.padding = 10;
 Chart.defaults.plugins.tooltip.titleFont = { weight: 700 };
 
-/* ---------- Data prep ---------- */
-const ROWS = window.DATA.filter(r => r.player && r.date && r.hand);
-document.getElementById("row-count").textContent = ROWS.length.toLocaleString();
+/* ---------- Live data feed ----------
+   The dashboard reads the "Form responses 1" tab straight from the Google
+   Sheet, so it refreshes itself as new hands are submitted to the form.
 
-// Index by (date, hand) — hand numbers were reused across early sessions
+   For the live feed to work the Sheet must be shared so that
+   "Anyone with the link" can VIEW it (Share ▸ General access ▸ Anyone
+   with the link ▸ Viewer). If the feed can't load, the dashboard falls
+   back to the snapshot baked into data.js and shows a "snapshot" badge.
+
+   Most-reliable alternative if the gviz URL is ever blocked: in the sheet
+   do File ▸ Share ▸ Publish to web ▸ "Form responses 1" ▸ CSV, then paste
+   that published URL into LIVE_CSV_URL below.
+*/
+const SHEET_ID = "1QdWqUcw3ykjQVaY7kCdEtVthWS5ACqNi3TuXTMRpm5w";
+const SHEET_TAB = "Form responses 1";
+const LIVE_CSV_URL =
+  `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SHEET_TAB)}`;
+const AUTO_REFRESH_SECONDS = 0;   // set e.g. 60 to auto-poll during a live game
+
 const handKey = r => `${r.date}|${r.hand}`;
-const HANDS = {};
-ROWS.forEach(r => {
-  const k = handKey(r);
-  const h = HANDS[k] ||= { key: k, hand: r.hand, date: r.date, players: {}, declarer: null, suit: null, ctricks: null, made: null, doubled: null };
-  h.players[r.player] = r;
-  if (r.declarer) {
-    h.declarer = r.declarer;
-    h.suit = r.suit;
-    h.ctricks = r.ctricks;
-    h.made = r.made;
-    h.doubled = r.doubled;
-  }
-});
-const HAND_LIST = Object.values(HANDS).sort((a,b) => a.date.localeCompare(b.date) || a.hand - b.hand);
-const ALL_DATES = [...new Set(ROWS.map(r => r.date))].sort();
-const DATE_LABEL = d => {
-  const [y,m,da] = d.split("-");
-  return `${da}/${m}/${y.slice(2)}`;
-};
+const DATE_LABEL = d => { const [y,m,da] = d.split("-"); return `${da}/${m}/${y.slice(2)}`; };
 
-document.getElementById("meta").innerHTML =
-  `${HAND_LIST.length.toLocaleString()} hands across ${ALL_DATES.length} sessions<br>` +
-  `${DATE_LABEL(ALL_DATES[0])} – ${DATE_LABEL(ALL_DATES[ALL_DATES.length-1])}`;
+// Mutable derived data — recomputed every time fresh rows arrive
+let ROWS = [], HANDS = {}, HAND_LIST = [], ALL_DATES = [], ALL_YEARS = [], LATEST_DATE = "", LATEST_YEAR = "";
 
-// Populate date filter
 const dateFilter = document.getElementById("date-filter");
-ALL_DATES.forEach(d => {
-  const o = document.createElement("option");
-  o.value = d; o.textContent = DATE_LABEL(d);
-  dateFilter.appendChild(o);
-});
-
-// Populate year filter (auto-detects from data)
-const ALL_YEARS = [...new Set(ROWS.map(r => r.date.slice(0,4)))].sort();
 const yearFilter = document.getElementById("year-filter");
-ALL_YEARS.forEach(y => {
-  const o = document.createElement("option");
-  o.value = y; o.textContent = y;
-  yearFilter.appendChild(o);
-});
 
-// Latest date — anything later than it is "ongoing"
-const LATEST_DATE = ALL_DATES[ALL_DATES.length - 1];
-const LATEST_YEAR = LATEST_DATE.slice(0, 4);
+function ingest(raw) {
+  ROWS = raw.filter(r => r.player && r.date && r.hand);
+  HANDS = {};
+  ROWS.forEach(r => {
+    const k = handKey(r);
+    const h = HANDS[k] ||= { key: k, hand: r.hand, date: r.date, players: {}, declarer: null, suit: null, ctricks: null, made: null, doubled: null };
+    h.players[r.player] = r;
+    if (r.declarer) {
+      h.declarer = r.declarer;
+      h.suit = r.suit;
+      h.ctricks = r.ctricks;
+      h.made = r.made;
+      h.doubled = r.doubled;
+    }
+  });
+  HAND_LIST = Object.values(HANDS).sort((a,b) => a.date.localeCompare(b.date) || a.hand - b.hand);
+  ALL_DATES = [...new Set(ROWS.map(r => r.date))].sort();
+  ALL_YEARS = [...new Set(ROWS.map(r => r.date.slice(0,4)))].sort();
+  LATEST_DATE = ALL_DATES[ALL_DATES.length - 1] || "";
+  LATEST_YEAR = LATEST_DATE.slice(0, 4);
+
+  document.getElementById("row-count").textContent = ROWS.length.toLocaleString();
+  document.getElementById("meta").innerHTML =
+    `${HAND_LIST.length.toLocaleString()} hands across ${ALL_DATES.length} sessions` +
+    (ALL_DATES.length ? `<br>${DATE_LABEL(ALL_DATES[0])} – ${DATE_LABEL(LATEST_DATE)}` : "");
+
+  // Rebuild the date/year dropdowns, keeping the current selection if still valid
+  const keepDate = state.date, keepYear = state.year;
+  dateFilter.innerHTML = '<option value="">All sessions</option>';
+  ALL_DATES.forEach(d => { const o = document.createElement("option"); o.value = d; o.textContent = DATE_LABEL(d); dateFilter.appendChild(o); });
+  if (ALL_DATES.includes(keepDate)) dateFilter.value = keepDate; else state.date = "";
+  yearFilter.innerHTML = '<option value="">All years</option>';
+  ALL_YEARS.forEach(y => { const o = document.createElement("option"); o.value = y; o.textContent = y; yearFilter.appendChild(o); });
+  if (ALL_YEARS.includes(keepYear)) yearFilter.value = keepYear; else state.year = "";
+}
+
+/* ---------- CSV parsing for the live feed ---------- */
+function parseCSV(text) {
+  const rows = []; let field = "", row = [], inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQ) {
+      if (c === '"') { if (text[i+1] === '"') { field += '"'; i++; } else inQ = false; }
+      else field += c;
+    } else if (c === '"') inQ = true;
+    else if (c === ',') { row.push(field); field = ""; }
+    else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ""; }
+    else if (c !== '\r') field += c;
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+function normDate(s) {
+  if (!s) return null;
+  s = String(s).trim();
+  let m = s.match(/^Date\((\d+),(\d+),(\d+)/);                    // gviz serial: month 0-indexed
+  if (m) return `${m[1]}-${String(+m[2]+1).padStart(2,'0')}-${String(+m[3]).padStart(2,'0')}`;
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);                  // dd/mm/yyyy
+  if (m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);                        // yyyy-mm-dd
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  return null;
+}
+function toNum(s) { if (s == null || s === "") return null; const n = parseInt(String(s).replace(/[^0-9-]/g, ""), 10); return isNaN(n) ? null : n; }
+
+function csvToRows(text) {
+  const grid = parseCSV(text);
+  if (grid.length < 2) return [];
+  const head = grid[0].map(h => h.trim());
+  const find = re => head.findIndex(h => re.test(h));
+  const ix = {
+    date:     find(/^date$/i),
+    hand:     find(/hand number/i),
+    player:   find(/^player$/i),
+    hcp:      find(/point count/i),
+    won:      find(/win the auction/i),
+    declarer: find(/^declarer$/i),
+    ctricks:  find(/contract to make/i),
+    suit:     find(/what suit/i),
+    made:     find(/tricks did you make/i),
+    doubled:  find(/doubled/i),
+    pts:      find(/points did you score/i),
+  };
+  const cell = (r, k) => ix[k] >= 0 ? (r[ix[k]] ?? "") : "";
+  const out = [];
+  for (let i = 1; i < grid.length; i++) {
+    const r = grid[i];
+    if (!r || r.length < 3) continue;
+    const player = String(cell(r, "player")).trim();
+    const date = normDate(cell(r, "date"));
+    const hand = toNum(cell(r, "hand"));
+    if (!player || !date || hand == null) continue;
+    out.push({
+      date, hand, player,
+      hcp: toNum(cell(r, "hcp")),
+      won: /^yes$/i.test(String(cell(r, "won")).trim()),
+      declarer: String(cell(r, "declarer")).trim() || null,
+      ctricks: toNum(cell(r, "ctricks")),
+      suit: String(cell(r, "suit")).trim() || null,
+      made: toNum(cell(r, "made")),
+      doubled: String(cell(r, "doubled")).trim() || null,
+      pts: toNum(cell(r, "pts")) || 0,
+    });
+  }
+  return out;
+}
+
+/* ---------- Status badge + load orchestration ---------- */
+function setStatus(kind, text) {
+  const el = document.getElementById("data-status");
+  el.className = "data-status " + kind;
+  el.querySelector(".status-text").textContent = text;
+}
+async function loadData() {
+  setStatus("loading", "Checking sheet…");
+  try {
+    const res = await fetch(LIVE_CSV_URL, { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const rows = csvToRows(await res.text());
+    if (!rows.length) throw new Error("no rows parsed");
+    ingest(rows);
+    render();
+    const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    setStatus("live", `Live · updated ${now}`);
+  } catch (e) {
+    if (!ROWS.length) { ingest(window.DATA); render(); }
+    setStatus("snapshot", "Saved snapshot (live feed unavailable)");
+    console.warn("Live fetch failed — using snapshot:", e);
+  }
+}
 
 /* ---------- State + controls ---------- */
 const state = {
@@ -1383,7 +1510,12 @@ function render() {
   renderLog();
 }
 
+// Initial paint from the embedded snapshot, then pull live data from the sheet
+ingest(window.DATA);
 render();
+loadData();
+document.getElementById("refresh-btn").addEventListener("click", loadData);
+if (AUTO_REFRESH_SECONDS > 0) setInterval(loadData, AUTO_REFRESH_SECONDS * 1000);
 </script>
 </body>
 </html>

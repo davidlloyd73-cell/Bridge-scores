@@ -41,14 +41,18 @@ open index.html        # macOS — xdg-open on Linux, start on Windows
 
 It's a single static file (`index.html`) plus an embedded data file (`data.js`). Chart.js is loaded from a CDN so you need an internet connection on first load.
 
-## Updating the data
+## Live data feed
 
-The form responses are kept in the Google Sheet. To refresh the dashboard with new sessions:
+The dashboard reads the **"Form responses 1"** tab straight from the Google Sheet every time it loads (and whenever you press **Refresh**), so it updates itself as new hands are submitted to the form.
 
-1. Download the sheet as `.xlsx`.
-2. Replace `sheet.xlsx` locally and run a small Python script (`openpyxl`) to regenerate `data.js`.
+For the live feed to work, the Sheet must be shared so that **Anyone with the link** can **view** it (Share ▸ General access ▸ Anyone with the link ▸ Viewer).
 
-The current dataset covers **2,319 hand-entries across 30 sessions** between June 2025 and May 2026 (560 hands). Per-year totals match the spreadsheet's own *Live Dashboard 2026* tab exactly.
+- A green **Live · updated HH:MM** badge means it's reading the sheet directly.
+- An amber **Saved snapshot** badge means the live feed couldn't load and it fell back to the bundled `data.js`. If you see this, either turn on link-sharing, or in the sheet do **File ▸ Share ▸ Publish to web ▸ "Form responses 1" ▸ CSV** and paste that URL into `LIVE_CSV_URL` near the top of the `<script>` in `index.html`.
+
+To poll automatically during a game, set `AUTO_REFRESH_SECONDS` (e.g. `60`) in the same place.
+
+`data.js` is just an offline snapshot/fallback. To refresh it: download the sheet as `.xlsx` and regenerate with a short `openpyxl` script. The bundled snapshot covers **2,319 hand-entries across 30 sessions** (560 hands) between June 2025 and May 2026, and its per-year totals match the spreadsheet's own *Live Dashboard 2026* tab exactly.
 
 ## Quirks handled
 
